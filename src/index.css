@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #faf6ed;
+    color: #3d2c1e;
+    margin: 0;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    text-align: left;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+  }
+}
