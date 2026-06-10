@@ -35,9 +35,15 @@ export interface Tour {
   id: string
   name: string
   description: string
-  category: 'Romantic' | 'Adventure' | 'Cultural' | 'Nature' | 'Water'
+  category: 'Romantic' | 'Adventure' | 'Cultural' | 'Nature' | 'Water' | 'Nightlife' | 'Beach Club'
+  cover_image_url: string
   tour_link_url: string
-  tiktok_url: string
+  tiktok_1: string
+  tiktok_2: string
+  tiktok_3: string
+  tiktok_4: string
+  inclusions: string[]
+  exclusions: string[]
   sort_order: number
 }
 

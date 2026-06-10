@@ -8,7 +8,7 @@ import HotelCard from '../components/HotelCard'
 import TourCard from '../components/TourCard'
 import type { City, Hotel, Tour } from '../types'
 
-const TOUR_CATEGORIES = ['All', 'Romantic', 'Adventure', 'Cultural', 'Nature', 'Water'] as const
+const TOUR_CATEGORIES = ['All', 'Romantic', 'Adventure', 'Cultural', 'Nature', 'Water', 'Nightlife', 'Beach Club'] as const
 
 export default function AreaScreen() {
   const { cityId } = useParams<{ cityId: string }>()

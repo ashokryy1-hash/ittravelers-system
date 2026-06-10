@@ -25,8 +25,14 @@ interface TourForm {
   name: string
   description: string
   category: string
+  cover_image_url: string
   tour_link_url: string
-  tiktok_url: string
+  tiktok_1: string
+  tiktok_2: string
+  tiktok_3: string
+  tiktok_4: string
+  inclusions: string[]
+  exclusions: string[]
   sort_order: number
   city_ids: string[]
 }
@@ -56,7 +62,10 @@ const emptyHotelForm: HotelForm = {
 
 const emptyTourForm: TourForm = {
   name: '', description: '', category: 'Romantic',
-  tour_link_url: '', tiktok_url: '', sort_order: 0, city_ids: [],
+  cover_image_url: '', tour_link_url: '',
+  tiktok_1: '', tiktok_2: '', tiktok_3: '', tiktok_4: '',
+  inclusions: [], exclusions: [],
+  sort_order: 0, city_ids: [],
 }
 
 const emptyAreaForm: AreaForm = {
@@ -284,6 +293,8 @@ function HotelModal({
 
 // ─── Tour Modal ────────────────────────────────────────────────────────────────
 
+const ALL_CATEGORIES = ['Romantic', 'Adventure', 'Cultural', 'Nature', 'Water', 'Nightlife', 'Beach Club']
+
 function TourModal({
   form, setForm, cities, onSave, onClose, saving,
 }: {
@@ -294,14 +305,14 @@ function TourModal({
   onClose: () => void
   saving: boolean
 }) {
+  const [inclInput, setInclInput] = useState('')
+  const [exclInput, setExclInput] = useState('')
+
   const toggleCity = (id: string) => {
-    setForm({
-      ...form,
-      city_ids: form.city_ids.includes(id)
-        ? form.city_ids.filter(c => c !== id)
-        : [...form.city_ids, id],
-    })
+    setForm({ ...form, city_ids: form.city_ids.includes(id) ? form.city_ids.filter(c => c !== id) : [...form.city_ids, id] })
   }
+  const addIncl = () => { if (inclInput.trim()) { setForm({ ...form, inclusions: [...form.inclusions, inclInput.trim()] }); setInclInput('') } }
+  const addExcl = () => { if (exclInput.trim()) { setForm({ ...form, exclusions: [...form.exclusions, exclInput.trim()] }); setExclInput('') } }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -311,93 +322,126 @@ function TourModal({
           <button onClick={onClose}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
         </div>
         <div className="p-6 space-y-4">
+
+          {/* Name */}
           <div>
             <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Tour Name *</label>
-            <input
-              value={form.name}
-              onChange={e => setForm({ ...form, name: e.target.value })}
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
               className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
-              placeholder="e.g. Ubud Elephant Tour"
-            />
+              placeholder="e.g. Ubud Elephant Tour" />
           </div>
+
+          {/* Description */}
           <div>
             <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Description</label>
-            <textarea
-              value={form.description}
-              onChange={e => setForm({ ...form, description: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400 resize-none"
-              rows={2}
-            />
+            <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400 resize-none" rows={2} />
           </div>
+
+          {/* Category + Sort */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Category</label>
-              <select
-                value={form.category}
-                onChange={e => setForm({ ...form, category: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
-              >
-                {['Romantic', 'Adventure', 'Cultural', 'Nature', 'Water'].map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+              <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400">
+                {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
               <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Sort Order</label>
-              <input
-                type="number"
-                value={form.sort_order}
-                onChange={e => setForm({ ...form, sort_order: Number(e.target.value) })}
-                className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
-              />
+              <input type="number" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: Number(e.target.value) })}
+                className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400" />
             </div>
           </div>
+
+          {/* Cover image */}
+          <div>
+            <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Cover Image URL</label>
+            <input value={form.cover_image_url} onChange={e => setForm({ ...form, cover_image_url: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
+              placeholder="https://... (leave blank to use category photo)" />
+            {form.cover_image_url && (
+              <img src={form.cover_image_url} alt="preview" className="mt-2 h-24 w-full object-cover rounded-lg border border-ivory-300" onError={e => (e.currentTarget.style.display = 'none')} />
+            )}
+          </div>
+
+          {/* Tour link */}
           <div>
             <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Tour Link URL</label>
-            <input
-              value={form.tour_link_url}
-              onChange={e => setForm({ ...form, tour_link_url: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
-              placeholder="https://..."
-            />
+            <input value={form.tour_link_url} onChange={e => setForm({ ...form, tour_link_url: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400" placeholder="https://..." />
           </div>
+
+          {/* TikTok links */}
           <div>
-            <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">TikTok URL (optional)</label>
-            <input
-              value={form.tiktok_url}
-              onChange={e => setForm({ ...form, tiktok_url: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
-            />
+            <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">TikTok Links (up to 4)</label>
+            <div className="space-y-2">
+              {(['tiktok_1','tiktok_2','tiktok_3','tiktok_4'] as const).map((k, i) => (
+                <input key={k} value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
+                  placeholder={`TikTok ${i + 1} URL (optional)`} />
+              ))}
+            </div>
           </div>
+
+          {/* Inclusions */}
+          <div>
+            <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Inclusions</label>
+            <div className="flex gap-2 mb-2">
+              <input value={inclInput} onChange={e => setInclInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIncl())}
+                className="flex-1 px-4 py-2 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
+                placeholder="e.g. Private driver, Entrance fees" />
+              <button onClick={addIncl} className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-body text-sm hover:bg-emerald-600 transition-colors">Add</button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {form.inclusions.map((item, i) => (
+                <span key={i} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-body text-emerald-700">
+                  {item}
+                  <button onClick={() => setForm({ ...form, inclusions: form.inclusions.filter((_, j) => j !== i) })}><X size={10} className="text-emerald-400 hover:text-red-400" /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Exclusions */}
+          <div>
+            <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Exclusions</label>
+            <div className="flex gap-2 mb-2">
+              <input value={exclInput} onChange={e => setExclInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addExcl())}
+                className="flex-1 px-4 py-2 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
+                placeholder="e.g. Lunch, Personal expenses" />
+              <button onClick={addExcl} className="px-4 py-2 bg-red-400 text-white rounded-xl font-body text-sm hover:bg-red-500 transition-colors">Add</button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {form.exclusions.map((item, i) => (
+                <span key={i} className="flex items-center gap-1 px-2.5 py-1 bg-red-50 border border-red-200 rounded-full text-xs font-body text-red-600">
+                  {item}
+                  <button onClick={() => setForm({ ...form, exclusions: form.exclusions.filter((_, j) => j !== i) })}><X size={10} className="text-red-300 hover:text-red-500" /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* City assignments */}
           <div>
             <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">City Assignments</label>
             <div className="flex flex-wrap gap-2 mt-1">
               {cities.map(city => (
-                <button
-                  key={city.id}
-                  type="button"
-                  onClick={() => toggleCity(city.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-body border transition-colors ${
-                    form.city_ids.includes(city.id)
-                      ? 'bg-terracotta-500 text-white border-terracotta-500'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-terracotta-300'
-                  }`}
-                >
+                <button key={city.id} type="button" onClick={() => toggleCity(city.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-body border transition-colors ${form.city_ids.includes(city.id) ? 'bg-terracotta-500 text-white border-terracotta-500' : 'bg-white text-gray-500 border-gray-200 hover:border-terracotta-300'}`}>
                   {city.name}
                 </button>
               ))}
             </div>
           </div>
         </div>
+
         <div className="sticky bottom-0 bg-white border-t border-ivory-200 px-6 py-4 flex justify-end gap-3">
-          <button onClick={onClose} className="px-5 py-2 border border-gray-200 rounded-xl font-body text-sm text-gray-500 hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="px-6 py-2 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-xl font-body text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
+          <button onClick={onClose} className="px-5 py-2 border border-gray-200 rounded-xl font-body text-sm text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={onSave} disabled={saving}
+            className="px-6 py-2 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-xl font-body text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2">
             {saving && <Loader2 size={14} className="animate-spin" />}
             Save Tour
           </button>
@@ -682,8 +726,14 @@ function AdminPanel() {
       name: tour.name,
       description: tour.description ?? '',
       category: tour.category,
+      cover_image_url: tour.cover_image_url ?? '',
       tour_link_url: tour.tour_link_url ?? '',
-      tiktok_url: tour.tiktok_url ?? '',
+      tiktok_1: tour.tiktok_1 ?? '',
+      tiktok_2: tour.tiktok_2 ?? '',
+      tiktok_3: tour.tiktok_3 ?? '',
+      tiktok_4: tour.tiktok_4 ?? '',
+      inclusions: tour.inclusions ?? [],
+      exclusions: tour.exclusions ?? [],
       sort_order: tour.sort_order ?? 0,
       city_ids: cityIds,
     })
