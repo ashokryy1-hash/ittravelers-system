@@ -120,16 +120,42 @@ export default function DestinationScreen() {
               <button
                 key={city.id}
                 onClick={() => navigate(`/bali/${city.id}`)}
-                className="group text-left p-4 rounded-xl bg-white hover:bg-terracotta-50 border border-ivory-300 hover:border-terracotta-300 transition-all shadow-sm hover:shadow-md"
+                className="group text-left rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all relative"
               >
-                <h3 className="font-display text-xl text-terracotta-700 group-hover:text-terracotta-600">
-                  {city.name}
-                </h3>
-                <p className="font-body text-xs text-gray-400 mt-0.5 italic">{city.vibe_tagline}</p>
-                {!city.has_hotels && (
-                  <span className="inline-block mt-2 text-xs font-body text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                    Day trips only
-                  </span>
+                {city.cover_image_url ? (
+                  <>
+                    <div className="h-36 w-full overflow-hidden">
+                      <img
+                        src={city.cover_image_url}
+                        alt={city.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                      <h3 className="font-display text-xl text-white leading-tight">{city.name}</h3>
+                      <p className="font-body text-xs text-white/75 mt-0.5 italic">{city.vibe_tagline}</p>
+                      {!city.has_hotels && (
+                        <span className="inline-block mt-1.5 text-xs font-body text-white/70 bg-white/20 px-2 py-0.5 rounded-full">
+                          Day trips only
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-4 bg-white hover:bg-terracotta-50 border border-ivory-300 hover:border-terracotta-300 rounded-xl transition-all h-36 flex flex-col justify-between">
+                    <h3 className="font-display text-xl text-terracotta-700 group-hover:text-terracotta-600">
+                      {city.name}
+                    </h3>
+                    <div>
+                      <p className="font-body text-xs text-gray-400 italic">{city.vibe_tagline}</p>
+                      {!city.has_hotels && (
+                        <span className="inline-block mt-2 text-xs font-body text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                          Day trips only
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
               </button>
             ))}

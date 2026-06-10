@@ -14,6 +14,7 @@ export interface City {
   vibe_tagline: string
   has_hotels: boolean
   sort_order: number
+  cover_image_url: string
 }
 
 export interface Hotel {
@@ -23,6 +24,7 @@ export interface Hotel {
   star_rating: number
   chain: string
   room_types: string[]
+  cover_image_url: string
   photo_link_url: string
   tiktok_url: string
   notes: string

@@ -14,6 +14,7 @@ interface HotelForm {
   chain: string
   city_id: string
   room_types: string[]
+  cover_image_url: string
   photo_link_url: string
   tiktok_url: string
   notes: string
@@ -36,6 +37,7 @@ interface AreaForm {
   destination_id: string
   has_hotels: boolean
   sort_order: number
+  cover_image_url: string
 }
 
 interface ExtractedHotel {
@@ -49,7 +51,7 @@ interface ExtractedHotel {
 
 const emptyHotelForm: HotelForm = {
   name: '', star_rating: 5, chain: '', city_id: '',
-  room_types: [], photo_link_url: '', tiktok_url: '', notes: '', sort_order: 0,
+  room_types: [], cover_image_url: '', photo_link_url: '', tiktok_url: '', notes: '', sort_order: 0,
 }
 
 const emptyTourForm: TourForm = {
@@ -59,7 +61,7 @@ const emptyTourForm: TourForm = {
 
 const emptyAreaForm: AreaForm = {
   name: '', vibe_tagline: '', destination_id: '',
-  has_hotels: true, sort_order: 0,
+  has_hotels: true, sort_order: 0, cover_image_url: '',
 }
 
 // ─── Password Gate ─────────────────────────────────────────────────────────────
@@ -222,12 +224,24 @@ function HotelModal({
           </div>
 
           <div>
-            <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Photo Link URL</label>
+            <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Card Cover Image URL</label>
+            <input
+              value={form.cover_image_url}
+              onChange={e => setForm({ ...form, cover_image_url: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
+              placeholder="https://... (direct image URL shown on the card)"
+            />
+            {form.cover_image_url && (
+              <img src={form.cover_image_url} alt="preview" className="mt-2 h-28 w-full object-cover rounded-lg border border-ivory-300" onError={e => (e.currentTarget.style.display = 'none')} />
+            )}
+          </div>
+          <div>
+            <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Photo Album Link (opens in new tab)</label>
             <input
               value={form.photo_link_url}
               onChange={e => setForm({ ...form, photo_link_url: e.target.value })}
               className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
-              placeholder="https://..."
+              placeholder="https://bit.ly/... (your existing photo folder links)"
             />
           </div>
           <div>
@@ -507,6 +521,7 @@ function AdminPanel() {
       chain: hotel.chain ?? '',
       city_id: hotel.city_id,
       room_types: hotel.room_types ?? [],
+      cover_image_url: hotel.cover_image_url ?? '',
       photo_link_url: hotel.photo_link_url ?? '',
       tiktok_url: hotel.tiktok_url ?? '',
       notes: hotel.notes ?? '',
@@ -685,6 +700,7 @@ function AdminPanel() {
           vibe_tagline: areaForm.vibe_tagline,
           has_hotels: areaForm.has_hotels,
           sort_order: areaForm.sort_order,
+          cover_image_url: areaForm.cover_image_url,
         }).eq('id', editingArea.id)
         if (error) throw error
         toast.success('Area updated.')
@@ -942,6 +958,18 @@ function AdminPanel() {
                   />
                 </div>
                 <div>
+                  <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Cover Image URL</label>
+                  <input
+                    value={areaForm.cover_image_url}
+                    onChange={e => setAreaForm({ ...areaForm, cover_image_url: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-ivory-300 font-body text-sm focus:outline-none focus:border-terracotta-400"
+                    placeholder="https://... (direct image URL for the area card)"
+                  />
+                  {areaForm.cover_image_url && (
+                    <img src={areaForm.cover_image_url} alt="preview" className="mt-2 h-24 w-full object-cover rounded-lg border border-ivory-300" onError={e => (e.currentTarget.style.display = 'none')} />
+                  )}
+                </div>
+                <div>
                   <label className="block font-body text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Destination</label>
                   <select
                     value={areaForm.destination_id}
@@ -1014,6 +1042,7 @@ function AdminPanel() {
                           destination_id: city.destination_id,
                           has_hotels: city.has_hotels,
                           sort_order: city.sort_order,
+                          cover_image_url: city.cover_image_url ?? '',
                         })
                       }}
                       className="p-1.5 text-gray-400 hover:text-terracotta-500 rounded-lg hover:bg-terracotta-50 transition-colors"
