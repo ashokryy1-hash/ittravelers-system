@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Send, MessageSquare, ChevronDown, ChevronUp, Edit2, X, Mail, Upload } from 'lucide-react'
+import { Plus, Send, MessageSquare, ChevronDown, ChevronUp, Edit2, X, Mail } from 'lucide-react'
 import type { HmsOutreachHotel, HmsOutreachEmail, HmsDestination } from '../types'
 import EmailPreviewPanel from '../components/EmailPreviewPanel'
 import { Modal } from './RatesScreen'

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, X, Check } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, X, Building2 } from 'lucide-react'
 import type { HmsHotel, HmsDestination, HmsRoomType } from '../types'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'

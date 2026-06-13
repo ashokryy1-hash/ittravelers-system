@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { AlertTriangle, Bell, Calendar, Building2, CalendarCheck } from 'lucide-react'
+import { AlertTriangle, Bell, CalendarCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { HmsHotel, HmsOutreachHotel, HmsBooking } from '../types'
 
