@@ -62,119 +62,160 @@ export default function OutreachScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['hms_outreach_hotels'] }),
   })
 
-  function buildOutreachTemplate(type: 'initial' | 'followup' | 'rate_received' | 'counter' | 'contract_request' | 'welcome', hotel: HmsOutreachHotel, sig: string) {
+  function buildOutreachTemplate(type: 'initial' | 'followup' | 'company_profile' | 'rate_received' | 'contract_request' | 'welcome', hotel: HmsOutreachHotel, sig: string) {
     const dest = (hotel as any).hms_destinations?.name ?? 'Bali'
 
     if (type === 'initial') return {
-      subject: `Partnership Inquiry — ITTravelers × ${hotel.name}`,
+      subject: `Direct Contracting Opportunity - InterTeam Travel x ${hotel.name}`,
       body: `Dear Sales Team,
 
-I hope this message finds you well.
+I hope you're doing well.
 
-My name is Ahmed Shokry, Operations Manager at ITTravelers (InterTeam Travel), an Egyptian travel agency specialising exclusively in honeymoon trips to Southeast Asia.
+My name is Ahmed Shokry, Operations Manager at InterTeam Travel, a Cairo-based travel agency established in 2003, specialising in honeymoon and tailor-made travel experiences.
 
-We work with a growing portfolio of Egyptian and Middle Eastern couples planning their honeymoon in ${dest}, and we are currently expanding our preferred hotel partners in the region.
+We are currently sending clients to properties in ${dest} through online platforms, and based on the positive feedback and strong interest from our market, we would like to explore working with you directly.
 
-We already have strong partnerships with top properties through Ini Vie Hospitality and Pramana Group, and we believe ${hotel.name} would be an excellent addition to our collection.
+Our goal is to establish a direct partnership and contract for the upcoming season, allowing us to streamline bookings, offer more competitive pricing, and build a stronger long-term collaboration.
 
-We would love to explore a partnership and kindly request your NET / agent rates or contracted rates for our consideration.
+Our primary market consists of Egyptian honeymooners and couples, with a high demand for private pool villas and boutique resort experiences — making your properties a perfect fit for our clients.
 
-Our clients are high-value honeymoon couples who typically book superior rooms and suites, and Egypt & the Middle East represent a strong and growing market for your property.
+We would appreciate it if you could share:
+• Contracted / net rates for travel partners
+• Any special honeymoon benefits or value-added services
+• Cancellation and payment policies
+• Property portfolio and fact sheets
+• Marketing materials (photos/videos)
 
-Please feel free to reply to this email or share your rate sheet at your convenience. We look forward to a long and fruitful partnership.
+We are confident that a direct collaboration would be mutually beneficial, and we look forward to building a successful partnership together.
 
 ${sig}`,
     }
 
     if (type === 'followup') return {
-      subject: `Following Up — ITTravelers Partnership Inquiry | ${hotel.name}`,
+      subject: `RE: Direct Contracting Opportunity - InterTeam Travel x ${hotel.name}`,
       body: `Dear Sales Team,
 
-I hope you are doing well.
+I hope you're doing well.
 
-I am writing to follow up on my previous email regarding a potential partnership between ITTravelers and ${hotel.name}.
+I'm just following up on my previous email regarding a potential direct partnership between InterTeam Travel and ${hotel.name}.
 
-We remain very interested in featuring your property in our honeymoon packages for Egyptian and Middle Eastern clients, and would love to receive your agent / NET rates at your earliest convenience.
+We are genuinely interested in working closely with you, especially as we are already generating demand for your properties from our market. We believe that establishing a direct contract would allow us to grow this volume further and create a more efficient and mutually beneficial collaboration.
 
-Please do not hesitate to reach out if you need any further information about our agency.
+I would really appreciate your support in sharing the requested details whenever convenient:
+• Contracted / net rates for travel partners
+• Honeymoon benefits or value-added services
+• Cancellation and payment policies
+• Property portfolio and fact sheets
+• Marketing materials (photos/videos)
+
+Looking forward to your response and hoping we can move forward together soon.
+
+${sig}`,
+    }
+
+    if (type === 'company_profile') return {
+      subject: `RE: Direct Contracting Opportunity - InterTeam Travel x ${hotel.name}`,
+      body: `Dear Sales Team,
+
+Om Swastiastu,
+
+Warm greetings from InterTeam Travel, Cairo.
+
+Thank you for your kind response and for considering our request to establish a partnership with ${hotel.name}. Please find below our company details for your review:
+
+Company Details
+Company Name: InterTeam Travel
+PIC: Ahmed Shokry
+Position: Operations Manager
+Phone: +201019923249
+Email: Ashokry@interteam.com.eg
+Address: Cairo, Egypt
+
+Market:
+Our primary market consists of Egyptian honeymooners and couples, with a strong focus on tailor-made and luxury experiences, particularly private pool villas and boutique resorts.
+
+Portfolio — Bali Properties Currently Supported:
+We are actively promoting and booking a range of boutique resorts, private villas, and luxury properties in Bali through our online platforms and direct partnerships, with focus on Ubud, Seminyak, and Uluwatu areas. We currently hold direct contracts with Ini Vie Hospitality and Pramana Group.
+
+We would be happy to further elaborate on our portfolio or share specific examples upon your request.
+
+We look forward to your feedback and to the possibility of building a successful and long-term collaboration together.
+
+Thank you once again for your time and consideration.
 
 ${sig}`,
     }
 
     if (type === 'rate_received') return {
-      subject: `Re: Partnership Inquiry — ITTravelers × ${hotel.name}`,
+      subject: `RE: Direct Contracting Opportunity - InterTeam Travel x ${hotel.name}`,
       body: `Dear Sales Team,
 
-Thank you for your reply and for sharing your rate information.
+Om Swastiastu,
 
-We have reviewed the details and are very interested in moving forward with ${hotel.name} as a preferred partner.
+Thank you very much for sending through the contract rates and campaign details.
 
-Could you please provide us with the following to proceed:
-• Rate sheet or brochure for all room categories
-• Meal plan inclusions and supplement costs
-• Seasonality breakdown (low / high / peak)
+We have reviewed the information and are very pleased with what we see. We are excited about the opportunity to feature ${hotel.name} in our honeymoon packages for Egyptian and Middle Eastern clients.
+
+To proceed, could you kindly also share:
+• Seasonality breakdown (low / high / peak dates)
 • Honeymoon inclusions or complimentary benefits for our clients
 • Cancellation and amendment policy
+• Marketing materials (photos/videos) if not already included
 
-We look forward to your response and hope to finalise our partnership soon.
-
-${sig}`,
-    }
-
-    if (type === 'counter') return {
-      subject: `Rate Discussion — ITTravelers × ${hotel.name}`,
-      body: `Dear Sales Team,
-
-Thank you for your patience as we reviewed your rate proposal.
-
-We appreciate the offer and are very interested in partnering with ${hotel.name}. To make this work within our pricing structure for Egyptian and Middle Eastern clients, we would like to kindly discuss the NET rates for selected room categories.
-
-Our honeymoon clients typically look for the best value experience, and a competitive NET rate will allow us to actively promote your property across our portfolio.
-
-Could we arrange a brief call or exchange to align on rates that work for both parties?
+We look forward to signing the contract and sending our first booking shortly.
 
 ${sig}`,
     }
 
     if (type === 'contract_request') return {
-      subject: `Contract Request — ITTravelers × ${hotel.name}`,
+      subject: `Contract Request — InterTeam Travel x ${hotel.name}`,
       body: `Dear Sales Team,
+
+Om Swastiastu,
 
 We are pleased to confirm our interest in formalising the partnership with ${hotel.name}.
 
 Could you please share the agent contract or partnership agreement for our review and signature? Please include:
 • Agreed NET rates per room category
-• Valid period (dates)
+• Valid booking and stay period
 • Payment terms and conditions
 • Cancellation and no-show policy
-• Commission or markup structure (if applicable)
 
-Once we receive and review the contract, we will process the signing promptly and look forward to sending our first booking shortly.
+Once we receive and review the contract, we will process the signing promptly and look forward to sending our first booking very soon.
 
 ${sig}`,
     }
 
     // welcome / signed
     return {
-      subject: `Partnership Confirmed — ITTravelers × ${hotel.name}`,
+      subject: `RE: Partnership Confirmed — InterTeam Travel x ${hotel.name}`,
       body: `Dear Sales Team,
 
-We are delighted to confirm that ${hotel.name} is now an official partner of ITTravelers.
+Om Swastiastu,
 
-We look forward to sending our first honeymoon booking soon. Please send us the following to get started:
-• Reservations email address
+We are delighted to confirm that ${hotel.name} is now an official partner of InterTeam Travel.
+
+We look forward to sending our first honeymoon booking soon. To get started, could you kindly confirm:
+• Reservations email address for booking requests
 • Preferred booking format (email / booking form)
-• Any seasonal promotions or honeymoon packages currently available
+• Any current seasonal promotions or honeymoon packages
 
-Thank you for the warm welcome. We are excited about this partnership and committed to growing together.
+Thank you for the warm welcome. We are committed to actively promoting your property and growing our partnership together.
 
 ${sig}`,
     }
   }
 
-  async function useOutreachTemplate(type: 'initial' | 'followup' | 'rate_received' | 'counter' | 'contract_request' | 'welcome', hotel: HmsOutreachHotel) {
+  async function useOutreachTemplate(type: 'initial' | 'followup' | 'company_profile' | 'rate_received' | 'contract_request' | 'welcome', hotel: HmsOutreachHotel) {
     const settings = await getSettings()
-    const sig = settings.agency_signature || 'ITTravelers\nAhmed Shokry – Operations Manager'
+    const sig = settings.agency_signature || `Kind Regards,
+Ahmed Shokry
+Operation Manager
+InterTeam Travel
+Email: Ashokry@interteam.com.eg
+Mobile: (+20) 1019923249
+Office: (02-23285092)
+Website: Ittravelers.com`
     const { subject, body } = buildOutreachTemplate(type, hotel, sig)
     setEmailDraft({ to: hotel.contact_email ?? '', subject, body, hotelId: hotel.id, type })
   }
@@ -299,7 +340,7 @@ Agency signature: ${settings.agency_signature}`
                 onToggle={() => setOpenCard(openCard === hotel.id ? null : hotel.id)}
                 onStageChange={(s) => updateStage.mutate({ id: hotel.id, stage: s as Stage })}
                 onDraftEmail={() => {}}
-                onTemplate={() => {}}
+                onTemplate={(_type: any) => {}}
                 stages={STAGES}
               />
             ))}
@@ -335,7 +376,7 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
   onToggle: () => void
   onStageChange: (stage: string) => void
   onDraftEmail: (type: 'initial' | 'followup') => void
-  onTemplate: (type: 'initial' | 'followup' | 'rate_received' | 'counter' | 'contract_request' | 'welcome') => void
+  onTemplate: (type: 'initial' | 'followup' | 'company_profile' | 'rate_received' | 'contract_request' | 'welcome') => void
   stages: readonly string[]
 }) {
   const qc = useQueryClient()
@@ -448,12 +489,16 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
 
             {hotel.stage === 'Replied' && (
               <>
-                <button onClick={() => onTemplate('rate_received')}
+                <button onClick={() => onTemplate('company_profile')}
                   className="w-full flex items-center justify-center gap-1 text-xs bg-purple-600 text-white rounded-lg py-1.5 hover:bg-purple-700">
-                  <Mail size={12} /> Thank you + request rate details
+                  <Mail size={12} /> Send company profile (most common reply)
+                </button>
+                <button onClick={() => onTemplate('rate_received')}
+                  className="w-full flex items-center justify-center gap-1 text-xs border border-purple-300 text-purple-700 rounded-lg py-1.5 hover:bg-purple-50">
+                  <Mail size={12} /> Acknowledge rates received
                 </button>
                 <button onClick={() => onTemplate('followup')}
-                  className="w-full flex items-center justify-center gap-1 text-xs border border-purple-200 text-purple-700 rounded-lg py-1.5 hover:bg-purple-50">
+                  className="w-full flex items-center justify-center gap-1 text-xs border border-slate-200 text-slate-500 rounded-lg py-1.5 hover:bg-slate-50">
                   <Send size={12} /> Chase for reply
                 </button>
               </>
@@ -461,13 +506,13 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
 
             {hotel.stage === 'Negotiating' && (
               <>
-                <button onClick={() => onTemplate('counter')}
-                  className="w-full flex items-center justify-center gap-1 text-xs bg-amber-600 text-white rounded-lg py-1.5 hover:bg-amber-700">
-                  <Mail size={12} /> Rate negotiation
-                </button>
                 <button onClick={() => onTemplate('contract_request')}
+                  className="w-full flex items-center justify-center gap-1 text-xs bg-amber-600 text-white rounded-lg py-1.5 hover:bg-amber-700">
+                  <Mail size={12} /> Request contract to sign
+                </button>
+                <button onClick={() => onTemplate('rate_received')}
                   className="w-full flex items-center justify-center gap-1 text-xs border border-amber-300 text-amber-700 rounded-lg py-1.5 hover:bg-amber-50">
-                  <Mail size={12} /> Request contract
+                  <Mail size={12} /> Follow up on rates
                 </button>
               </>
             )}
