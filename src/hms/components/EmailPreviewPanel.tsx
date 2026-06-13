@@ -5,13 +5,14 @@ interface Props {
   to: string
   subject: string
   body: string
-  onSend: (subject: string, body: string) => Promise<void>
+  onSend: (subject: string, body: string, to: string) => Promise<void>
   onClose: () => void
   sending?: boolean
 }
 
-export default function EmailPreviewPanel({ to, subject: initSubject, body: initBody, onSend, onClose, sending }: Props) {
+export default function EmailPreviewPanel({ to: initTo, subject: initSubject, body: initBody, onSend, onClose, sending }: Props) {
   const [editing, setEditing] = useState(false)
+  const [to, setTo] = useState(initTo)
   const [subject, setSubject] = useState(initSubject)
   const [body, setBody] = useState(initBody)
 
@@ -28,9 +29,18 @@ export default function EmailPreviewPanel({ to, subject: initSubject, body: init
 
         {/* Meta */}
         <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 space-y-2 text-sm">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <span className="text-gray-500 w-14 shrink-0">To:</span>
-            <span className="text-gray-800 font-medium">{to}</span>
+            {editing ? (
+              <input
+                className="flex-1 border border-gray-300 rounded px-2 py-0.5 text-sm"
+                value={to}
+                onChange={e => setTo(e.target.value)}
+                placeholder="recipient@hotel.com"
+              />
+            ) : (
+              <span className="text-gray-800 font-medium">{to || '(no email)'}</span>
+            )}
           </div>
           <div className="flex gap-2 items-center">
             <span className="text-gray-500 w-14 shrink-0">Subject:</span>
@@ -70,7 +80,7 @@ export default function EmailPreviewPanel({ to, subject: initSubject, body: init
           </button>
 
           <button
-            onClick={() => onSend(subject, body)}
+            onClick={() => onSend(subject, body, to)}
             disabled={sending}
             className="flex items-center gap-2 text-sm bg-teal-600 text-white rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
           >

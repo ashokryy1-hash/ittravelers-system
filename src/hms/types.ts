@@ -106,6 +106,7 @@ export interface HmsBooking {
   meal_plan: string | null
   status: 'Availability pending' | 'Confirmed' | 'Paid' | 'Cancelled'
   hotel_confirmation_number: string | null
+  cutoff_date: string | null
   notes: string | null
   created_at: string
   hms_hotels?: HmsHotel

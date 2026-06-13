@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Mail, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import type { HmsBooking, HmsBookingEmail, HmsHotel, HmsRoomType } from '../types'
 import EmailPreviewPanel from '../components/EmailPreviewPanel'
 import { Modal } from './RatesScreen'
 import { getSettings } from '../lib/settings'
 import { nightsBetween } from '../lib/season'
 import toast from 'react-hot-toast'
+
+function daysUntil(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null
+  const diff = new Date(dateStr).getTime() - new Date().setHours(0, 0, 0, 0)
+  return Math.ceil(diff / 86400000)
+}
 
 const STATUS_COLORS: Record<string, string> = {
   'Availability pending': 'bg-amber-100 text-amber-700',
@@ -135,7 +141,7 @@ export default function ReservationsScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('hms_bookings')
-        .select('*, hms_hotels(name, contact_email, reservation_email, city, surcharge_waiver), hms_room_types(name, room_category, meal_plan, currency, low_season_rate, high_season_rate, peak_season_rate)')
+        .select('*, cutoff_date, hms_hotels(name, contact_email, reservation_email, city, surcharge_waiver), hms_room_types(name, room_category, meal_plan, currency, low_season_rate, high_season_rate, peak_season_rate)')
         .order('checkin_date')
       return data ?? []
     },
@@ -195,7 +201,7 @@ Agency signature: ${settings.agency_signature}`
     }
   }
 
-  async function sendEmail(subject: string, body: string) {
+  async function sendEmail(subject: string, body: string, to: string) {
     if (!emailDraft) return
     setSendingEmail(true)
     await supabase.from('hms_booking_emails').insert({
@@ -210,7 +216,7 @@ Agency signature: ${settings.agency_signature}`
       await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emailDraft.to, subject, body, senderName: settings.outlook_sender_name }),
+        body: JSON.stringify({ to, subject, body, senderName: settings.outlook_sender_name }),
       })
     } catch {}
     qc.invalidateQueries({ queryKey: ['hms_booking_emails', emailDraft.bookingId] })
@@ -284,7 +290,7 @@ Agency signature: ${settings.agency_signature}`
 
       {emailDraft && (
         <EmailPreviewPanel
-          to={emailDraft.to || '(no contact email)'}
+          to={emailDraft.to}
           subject={emailDraft.subject}
           body={emailDraft.body}
           onSend={sendEmail}
@@ -309,6 +315,10 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
   const [incomingEmail, setIncomingEmail] = useState('')
   const [incomingSubject, setIncomingSubject] = useState('')
   const [confirmNumber, setConfirmNumber] = useState(booking.hotel_confirmation_number ?? '')
+  const [cutoffDate, setCutoffDate] = useState(booking.cutoff_date ?? '')
+
+  const cutoffDays = daysUntil(booking.cutoff_date)
+  const showCutoffWarning = cutoffDays !== null && cutoffDays <= 14 && booking.status !== 'Paid' && booking.status !== 'Cancelled'
 
   const { data: emails } = useQuery<HmsBookingEmail[]>({
     queryKey: ['hms_booking_emails', booking.id],
@@ -320,10 +330,11 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
   })
 
   const updateStatus = useMutation({
-    mutationFn: async ({ status, confirmNum }: { status: string; confirmNum?: string }) => {
+    mutationFn: async ({ status, confirmNum, cutoff }: { status: string; confirmNum?: string; cutoff?: string | null }) => {
       await supabase.from('hms_bookings').update({
         status,
         hotel_confirmation_number: confirmNum ?? booking.hotel_confirmation_number,
+        ...(cutoff !== undefined ? { cutoff_date: cutoff } : {}),
       }).eq('id', booking.id)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['hms_bookings'] }),
@@ -357,6 +368,12 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {showCutoffWarning && (
+              <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                <AlertTriangle size={12} />
+                {cutoffDays! <= 0 ? 'Cutoff PASSED' : `Pay in ${cutoffDays}d`}
+              </span>
+            )}
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[booking.status] ?? ''}`}>
               {booking.status}
             </span>
@@ -390,21 +407,33 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
             ))}
           </div>
 
-          {/* Confirm number */}
+          {/* Confirm number + cutoff date */}
           {booking.status === 'Confirmed' && (
-            <div className="flex gap-2">
-              <input
-                className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5"
-                placeholder="Hotel confirmation number"
-                value={confirmNumber}
-                onChange={e => setConfirmNumber(e.target.value)}
-              />
-              <button
-                onClick={() => updateStatus.mutate({ status: booking.status, confirmNum: confirmNumber })}
-                className="text-sm bg-teal-600 text-white rounded-lg px-3 py-1.5 hover:bg-teal-700"
-              >
-                Save
-              </button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5"
+                  placeholder="Hotel confirmation number"
+                  value={confirmNumber}
+                  onChange={e => setConfirmNumber(e.target.value)}
+                />
+                <button
+                  onClick={() => updateStatus.mutate({ status: booking.status, confirmNum: confirmNumber, cutoff: cutoffDate || null })}
+                  className="text-sm bg-teal-600 text-white rounded-lg px-3 py-1.5 hover:bg-teal-700"
+                >
+                  Save
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-500 shrink-0">Hotel payment cutoff:</label>
+                <input
+                  type="date"
+                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 flex-1"
+                  value={cutoffDate}
+                  onChange={e => setCutoffDate(e.target.value)}
+                />
+                <span className="text-xs text-slate-400">(reminder 14 days before)</span>
+              </div>
             </div>
           )}
 
