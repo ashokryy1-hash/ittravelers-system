@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, X, Building2 } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, X, Building2, FileUp } from 'lucide-react'
 import type { HmsHotel, HmsDestination, HmsRoomType } from '../types'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import PdfContractUpload from '../components/PdfContractUpload'
 
 function contractBadge(status: string) {
   if (status === 'Active') return 'bg-teal-100 text-teal-700'
@@ -15,6 +16,7 @@ function contractBadge(status: string) {
 export default function RatesScreen() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
+  const [showPdfUpload, setShowPdfUpload] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editHotel, setEditHotel] = useState<HmsHotel | null>(null)
 
@@ -63,10 +65,16 @@ export default function RatesScreen() {
             Rate Viewer / Quote
           </Link>
           <button
+            onClick={() => setShowPdfUpload(true)}
+            className="flex items-center gap-1 text-sm bg-slate-700 text-white rounded-lg px-4 py-2 hover:bg-slate-800"
+          >
+            <FileUp size={15} /> Upload Contract PDF
+          </button>
+          <button
             onClick={() => { setShowForm(true); setEditHotel(null) }}
             className="flex items-center gap-1 text-sm border border-slate-300 rounded-lg px-4 py-2 hover:bg-slate-50"
           >
-            <Plus size={15} /> Add Hotel
+            <Plus size={15} /> Add Manually
           </button>
         </div>
       </div>
@@ -122,6 +130,13 @@ export default function RatesScreen() {
           hotel={editHotel}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['hms_hotels'] }) }}
+        />
+      )}
+
+      {showPdfUpload && (
+        <PdfContractUpload
+          onClose={() => setShowPdfUpload(false)}
+          onSaved={() => { setShowPdfUpload(false); qc.invalidateQueries({ queryKey: ['hms_hotels'] }) }}
         />
       )}
     </div>
