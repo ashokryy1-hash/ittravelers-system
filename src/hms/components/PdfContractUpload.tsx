@@ -87,98 +87,22 @@ export default function PdfContractUpload({ onClose, onSaved }: Props) {
       // Convert PDF to base64
       const base64 = await fileToBase64(file)
 
-      // Call Claude API with PDF
-      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY ?? ''
-      if (!apiKey) {
-        setErrorMsg('Anthropic API key not configured. Go to Settings to add it.')
-        setStep('upload')
-        return
-      }
-
-      const prompt = `You are extracting hotel contract data from a PDF. Extract ALL information and return it as valid JSON only — no explanation, no markdown, just the raw JSON object.
-
-Extract this structure:
-{
-  "name": "hotel name",
-  "city": "city or area (e.g. Ubud, Seminyak, Uluwatu)",
-  "star_rating": 5,
-  "chain": "chain or group name (e.g. Ini Vie Hospitality, Pramana Group) or empty string",
-  "contact_name": "contact person name or empty string",
-  "contact_email": "sales or reservations email or empty string",
-  "surcharge_waiver": "none or 50% or 100%",
-  "valid_from": "YYYY-MM-DD or empty string",
-  "valid_to": "YYYY-MM-DD or empty string",
-  "booking_window_from": "YYYY-MM-DD or empty string",
-  "booking_window_to": "YYYY-MM-DD or empty string",
-  "photo_link_url": "photo or media link if found or empty string",
-  "notes": "any important notes, policies, or conditions",
-  "room_types": [
-    {
-      "name": "room type name",
-      "room_category": "room or villa",
-      "low_season_rate": 1500000,
-      "high_season_rate": 2000000,
-      "peak_season_rate": 2500000,
-      "currency": "IDR or THB or USD",
-      "meal_plan": "RO or BB or HB or FB or AI",
-      "notes": "any notes about this room type"
-    }
-  ]
-}
-
-Rules:
-- room_category is "villa" if it has a private pool, otherwise "room"
-- Use null for any rate not mentioned
-- If only one rate is given, put it in low_season_rate
-- currency defaults to IDR for Bali contracts
-- meal_plan defaults to BB if not specified
-- Return ONLY the JSON, nothing else`
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      // Call our server-side API route (avoids browser CORS restrictions)
+      const response = await fetch('/api/extract-contract', {
         method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2000,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'document',
-                  source: {
-                    type: 'base64',
-                    media_type: 'application/pdf',
-                    data: base64,
-                  },
-                },
-                {
-                  type: 'text',
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pdfBase64: base64 }),
       })
 
       const data = await response.json()
 
-      if (data.error) {
-        setErrorMsg(`API error: ${data.error.message}`)
+      if (!response.ok) {
+        setErrorMsg(`Extraction failed: ${data.error ?? 'Unknown error'}`)
         setStep('upload')
         return
       }
 
-      const rawText = data.content?.[0]?.text ?? ''
-
-      // Parse JSON — strip any accidental markdown fences
-      const jsonText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-      const hotel: ExtractedHotel = JSON.parse(jsonText)
+      const hotel: ExtractedHotel = data
 
       // Check if hotel already exists
       const match = existingHotels?.find(
