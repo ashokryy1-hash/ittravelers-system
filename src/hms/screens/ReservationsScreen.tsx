@@ -29,7 +29,7 @@ export default function ReservationsScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('hms_bookings')
-        .select('*, hms_hotels(name, contact_email, city, surcharge_waiver), hms_room_types(name, room_category, meal_plan, currency, low_season_rate, high_season_rate, peak_season_rate)')
+        .select('*, hms_hotels(name, contact_email, reservation_email, city, surcharge_waiver), hms_room_types(name, room_category, meal_plan, currency, low_season_rate, high_season_rate, peak_season_rate)')
         .order('checkin_date')
       return data ?? []
     },
@@ -61,27 +61,18 @@ The email must:
 Agency signature: ${settings.agency_signature}`
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/draft-email', {
         method: 'POST',
-        headers: {
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY ?? '',
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: userPrompt
-          }],
-        }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: userPrompt }),
       })
+      if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
-      const body = data.content?.[0]?.text ?? ''
+      const body = data.text ?? ''
       toast.dismiss('draft')
+      const toEmail = hotel?.reservation_email || hotel?.contact_email || ''
       setEmailDraft({
-        to: hotel?.contact_email ?? '',
+        to: toEmail,
         subject: `Availability Request — ${booking.checkin_date} to ${booking.checkout_date}`,
         body,
         bookingId: booking.id,
@@ -406,6 +397,7 @@ function BookingForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
       room_type_id: roomId,
       meal_plan: room?.meal_plan ?? f.meal_plan,
       currency: room?.currency ?? f.currency,
+      rate_per_night: room?.low_season_rate ? String(room.low_season_rate) : f.rate_per_night,
     }))
   }
 
