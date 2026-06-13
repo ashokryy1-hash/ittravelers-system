@@ -62,12 +62,12 @@ export default function OutreachScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['hms_outreach_hotels'] }),
   })
 
-  function buildOutreachTemplate(type: 'initial' | 'followup', hotel: HmsOutreachHotel, sig: string) {
+  function buildOutreachTemplate(type: 'initial' | 'followup' | 'rate_received' | 'counter' | 'contract_request' | 'welcome', hotel: HmsOutreachHotel, sig: string) {
     const dest = (hotel as any).hms_destinations?.name ?? 'Bali'
-    if (type === 'initial') {
-      return {
-        subject: `Partnership Inquiry — ITTravelers × ${hotel.name}`,
-        body: `Dear Sales Team,
+
+    if (type === 'initial') return {
+      subject: `Partnership Inquiry — ITTravelers × ${hotel.name}`,
+      body: `Dear Sales Team,
 
 I hope this message finds you well.
 
@@ -84,9 +84,9 @@ Our clients are high-value honeymoon couples who typically book superior rooms a
 Please feel free to reply to this email or share your rate sheet at your convenience. We look forward to a long and fruitful partnership.
 
 ${sig}`,
-      }
     }
-    return {
+
+    if (type === 'followup') return {
       subject: `Following Up — ITTravelers Partnership Inquiry | ${hotel.name}`,
       body: `Dear Sales Team,
 
@@ -100,9 +100,79 @@ Please do not hesitate to reach out if you need any further information about ou
 
 ${sig}`,
     }
+
+    if (type === 'rate_received') return {
+      subject: `Re: Partnership Inquiry — ITTravelers × ${hotel.name}`,
+      body: `Dear Sales Team,
+
+Thank you for your reply and for sharing your rate information.
+
+We have reviewed the details and are very interested in moving forward with ${hotel.name} as a preferred partner.
+
+Could you please provide us with the following to proceed:
+• Rate sheet or brochure for all room categories
+• Meal plan inclusions and supplement costs
+• Seasonality breakdown (low / high / peak)
+• Honeymoon inclusions or complimentary benefits for our clients
+• Cancellation and amendment policy
+
+We look forward to your response and hope to finalise our partnership soon.
+
+${sig}`,
+    }
+
+    if (type === 'counter') return {
+      subject: `Rate Discussion — ITTravelers × ${hotel.name}`,
+      body: `Dear Sales Team,
+
+Thank you for your patience as we reviewed your rate proposal.
+
+We appreciate the offer and are very interested in partnering with ${hotel.name}. To make this work within our pricing structure for Egyptian and Middle Eastern clients, we would like to kindly discuss the NET rates for selected room categories.
+
+Our honeymoon clients typically look for the best value experience, and a competitive NET rate will allow us to actively promote your property across our portfolio.
+
+Could we arrange a brief call or exchange to align on rates that work for both parties?
+
+${sig}`,
+    }
+
+    if (type === 'contract_request') return {
+      subject: `Contract Request — ITTravelers × ${hotel.name}`,
+      body: `Dear Sales Team,
+
+We are pleased to confirm our interest in formalising the partnership with ${hotel.name}.
+
+Could you please share the agent contract or partnership agreement for our review and signature? Please include:
+• Agreed NET rates per room category
+• Valid period (dates)
+• Payment terms and conditions
+• Cancellation and no-show policy
+• Commission or markup structure (if applicable)
+
+Once we receive and review the contract, we will process the signing promptly and look forward to sending our first booking shortly.
+
+${sig}`,
+    }
+
+    // welcome / signed
+    return {
+      subject: `Partnership Confirmed — ITTravelers × ${hotel.name}`,
+      body: `Dear Sales Team,
+
+We are delighted to confirm that ${hotel.name} is now an official partner of ITTravelers.
+
+We look forward to sending our first honeymoon booking soon. Please send us the following to get started:
+• Reservations email address
+• Preferred booking format (email / booking form)
+• Any seasonal promotions or honeymoon packages currently available
+
+Thank you for the warm welcome. We are excited about this partnership and committed to growing together.
+
+${sig}`,
+    }
   }
 
-  async function useOutreachTemplate(type: 'initial' | 'followup', hotel: HmsOutreachHotel) {
+  async function useOutreachTemplate(type: 'initial' | 'followup' | 'rate_received' | 'counter' | 'contract_request' | 'welcome', hotel: HmsOutreachHotel) {
     const settings = await getSettings()
     const sig = settings.agency_signature || 'ITTravelers\nAhmed Shokry – Operations Manager'
     const { subject, body } = buildOutreachTemplate(type, hotel, sig)
@@ -203,7 +273,7 @@ Agency signature: ${settings.agency_signature}`
                     onToggle={() => setOpenCard(openCard === hotel.id ? null : hotel.id)}
                     onStageChange={(s) => updateStage.mutate({ id: hotel.id, stage: s as Stage })}
                     onDraftEmail={(type) => draftOutreachEmail(hotel, type)}
-                    onTemplate={(type) => useOutreachTemplate(type, hotel)}
+                    onTemplate={(type: any) => useOutreachTemplate(type, hotel)}
                     stages={STAGES}
                   />
                 ))}
@@ -265,7 +335,7 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
   onToggle: () => void
   onStageChange: (stage: string) => void
   onDraftEmail: (type: 'initial' | 'followup') => void
-  onTemplate: (type: 'initial' | 'followup') => void
+  onTemplate: (type: 'initial' | 'followup' | 'rate_received' | 'counter' | 'contract_request' | 'welcome') => void
   stages: readonly string[]
 }) {
   const qc = useQueryClient()
@@ -348,39 +418,65 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
 
           {/* Email actions */}
           <div className="space-y-1.5">
+            <div className="text-xs font-medium text-slate-400">Email templates (instant)</div>
+
             {hotel.stage === 'Prospect' && (
               <>
-                <div className="text-xs font-medium text-slate-400 mb-1">Email templates (instant)</div>
-                <button
-                  onClick={() => onTemplate('initial')}
-                  className="w-full flex items-center justify-center gap-1 text-xs bg-teal-600 text-white rounded-lg py-1.5 hover:bg-teal-700"
-                >
+                <button onClick={() => onTemplate('initial')}
+                  className="w-full flex items-center justify-center gap-1 text-xs bg-teal-600 text-white rounded-lg py-1.5 hover:bg-teal-700">
                   <Mail size={12} /> Partnership outreach
                 </button>
-                <button
-                  onClick={() => onDraftEmail('initial')}
-                  className="w-full flex items-center justify-center gap-1 text-xs border border-slate-200 text-slate-500 rounded-lg py-1.5 hover:bg-slate-50"
-                >
-                  <Mail size={12} /> AI-written draft (requires credits)
+                <button onClick={() => onDraftEmail('initial')}
+                  className="w-full flex items-center justify-center gap-1 text-xs border border-slate-200 text-slate-500 rounded-lg py-1.5 hover:bg-slate-50">
+                  <Mail size={12} /> AI draft (requires credits)
                 </button>
               </>
             )}
-            {(hotel.stage === 'Contacted' || hotel.stage === 'Replied' || hotel.stage === 'Negotiating') && (
+
+            {hotel.stage === 'Contacted' && (
               <>
-                <div className="text-xs font-medium text-slate-400 mb-1">Email templates (instant)</div>
-                <button
-                  onClick={() => onTemplate('followup')}
-                  className="w-full flex items-center justify-center gap-1 text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700"
-                >
-                  <Send size={12} /> Follow-up
+                <button onClick={() => onTemplate('followup')}
+                  className="w-full flex items-center justify-center gap-1 text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700">
+                  <Send size={12} /> Follow-up (no reply yet)
                 </button>
-                <button
-                  onClick={() => onDraftEmail('followup')}
-                  className="w-full flex items-center justify-center gap-1 text-xs border border-slate-200 text-slate-500 rounded-lg py-1.5 hover:bg-slate-50"
-                >
-                  <Mail size={12} /> AI-written draft (requires credits)
+                <button onClick={() => onDraftEmail('followup')}
+                  className="w-full flex items-center justify-center gap-1 text-xs border border-slate-200 text-slate-500 rounded-lg py-1.5 hover:bg-slate-50">
+                  <Mail size={12} /> AI draft (requires credits)
                 </button>
               </>
+            )}
+
+            {hotel.stage === 'Replied' && (
+              <>
+                <button onClick={() => onTemplate('rate_received')}
+                  className="w-full flex items-center justify-center gap-1 text-xs bg-purple-600 text-white rounded-lg py-1.5 hover:bg-purple-700">
+                  <Mail size={12} /> Thank you + request rate details
+                </button>
+                <button onClick={() => onTemplate('followup')}
+                  className="w-full flex items-center justify-center gap-1 text-xs border border-purple-200 text-purple-700 rounded-lg py-1.5 hover:bg-purple-50">
+                  <Send size={12} /> Chase for reply
+                </button>
+              </>
+            )}
+
+            {hotel.stage === 'Negotiating' && (
+              <>
+                <button onClick={() => onTemplate('counter')}
+                  className="w-full flex items-center justify-center gap-1 text-xs bg-amber-600 text-white rounded-lg py-1.5 hover:bg-amber-700">
+                  <Mail size={12} /> Rate negotiation
+                </button>
+                <button onClick={() => onTemplate('contract_request')}
+                  className="w-full flex items-center justify-center gap-1 text-xs border border-amber-300 text-amber-700 rounded-lg py-1.5 hover:bg-amber-50">
+                  <Mail size={12} /> Request contract
+                </button>
+              </>
+            )}
+
+            {hotel.stage === 'Signed' && (
+              <button onClick={() => onTemplate('welcome')}
+                className="w-full flex items-center justify-center gap-1 text-xs bg-teal-600 text-white rounded-lg py-1.5 hover:bg-teal-700">
+                <Mail size={12} /> Welcome + first booking info
+              </button>
             )}
           </div>
 
