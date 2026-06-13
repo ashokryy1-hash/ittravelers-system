@@ -16,6 +16,112 @@ const STATUS_COLORS: Record<string, string> = {
   'Cancelled': 'bg-red-100 text-red-700',
 }
 
+function buildEmailTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel', booking: HmsBooking, settings: Record<string, string>) {
+  const hotel = (booking as any).hms_hotels
+  const room = (booking as any).hms_room_types
+  const hotelName = hotel?.name ?? 'your hotel'
+  const roomName = room?.name ?? booking.notes ?? 'the reserved room'
+  const mealPlan = room?.meal_plan ?? ''
+  const currency = booking.currency
+  const rate = booking.rate_per_night?.toLocaleString() ?? '0'
+  const checkin = booking.checkin_date
+  const checkout = booking.checkout_date
+  const nights = booking.nights
+  const sig = settings.agency_signature ?? 'ITTravelers\nAhmed Shokry – Operations Manager'
+  const toEmail = hotel?.reservation_email || hotel?.contact_email || ''
+
+  if (type === 'availability') {
+    return {
+      to: toEmail,
+      subject: `Availability Request — ${checkin} to ${checkout} | ${hotelName}`,
+      body: `Dear Reservations Team,
+
+I hope this message finds you well.
+
+I am writing on behalf of ITTravelers to kindly request availability for the following reservation:
+
+• Hotel: ${hotelName}
+• Room Type: ${roomName}${mealPlan ? ` (${mealPlan})` : ''}
+• Check-in: ${checkin}
+• Check-out: ${checkout}
+• Duration: ${nights} night${nights !== 1 ? 's' : ''}
+• Rate: ${currency} ${rate}/night (as per our corporate contract)
+• Guests: Honeymoon couple
+
+Could you please confirm availability and kindly hold the room pending our voucher?
+
+We look forward to your reply.
+
+${sig}`,
+    }
+  }
+
+  if (type === 'confirm') {
+    return {
+      to: toEmail,
+      subject: `Reservation Confirmation — ${checkin} to ${checkout} | ${hotelName}`,
+      body: `Dear Reservations Team,
+
+Thank you for confirming availability. We are pleased to proceed with the following reservation:
+
+• Hotel: ${hotelName}
+• Guest: ${booking.client_name} (Honeymoon couple)
+• Room Type: ${roomName}${mealPlan ? ` (${mealPlan})` : ''}
+• Check-in: ${checkin} at 2:00 PM
+• Check-out: ${checkout} at 12:00 PM
+• Duration: ${nights} night${nights !== 1 ? 's' : ''}
+• Rate: ${currency} ${rate}/night (as per our corporate contract)
+• Total: ${currency} ${booking.total_price_idr?.toLocaleString()}
+
+Please send us the official hotel voucher and payment details at your earliest convenience.
+
+${sig}`,
+    }
+  }
+
+  if (type === 'payment') {
+    return {
+      to: toEmail,
+      subject: `Payment Confirmation — ${booking.client_name} | ${checkin} | ${hotelName}`,
+      body: `Dear Reservations Team,
+
+We are writing to confirm that payment has been processed for the following reservation:
+
+• Hotel: ${hotelName}
+• Guest: ${booking.client_name}
+• Room Type: ${roomName}
+• Check-in: ${checkin}
+• Check-out: ${checkout}
+• Total Paid: ${currency} ${booking.total_price_idr?.toLocaleString()}
+${booking.hotel_confirmation_number ? `• Confirmation Number: ${booking.hotel_confirmation_number}` : ''}
+
+Please kindly acknowledge receipt and confirm the reservation is fully secured.
+
+${sig}`,
+    }
+  }
+
+  // cancel
+  return {
+    to: toEmail,
+    subject: `Cancellation Request — ${booking.client_name} | ${checkin} | ${hotelName}`,
+    body: `Dear Reservations Team,
+
+We regret to inform you that we must cancel the following reservation:
+
+• Hotel: ${hotelName}
+• Guest: ${booking.client_name}
+• Room Type: ${roomName}
+• Check-in: ${checkin}
+• Check-out: ${checkout}
+${booking.hotel_confirmation_number ? `• Confirmation Number: ${booking.hotel_confirmation_number}` : ''}
+
+We sincerely apologise for any inconvenience caused. Please confirm the cancellation and advise on any applicable charges per your cancellation policy.
+
+${sig}`,
+  }
+}
+
 export default function ReservationsScreen() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
@@ -35,9 +141,15 @@ export default function ReservationsScreen() {
     },
   })
 
+  async function useTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel', booking: HmsBooking) {
+    const settings = await getSettings()
+    const draft = buildEmailTemplate(type, booking, settings)
+    setEmailDraft({ ...draft, bookingId: booking.id })
+  }
+
   async function draftAvailabilityEmail(booking: HmsBooking) {
     const settings = await getSettings()
-    toast.loading('Generating email draft…', { id: 'draft' })
+    toast.loading('Generating AI draft…', { id: 'draft' })
 
     const hotel = (booking as any).hms_hotels
     const room = (booking as any).hms_room_types
@@ -154,6 +266,7 @@ Agency signature: ${settings.agency_signature}`
             expanded={openBooking === booking.id}
             onToggle={() => setOpenBooking(openBooking === booking.id ? null : booking.id)}
             onDraftEmail={() => draftAvailabilityEmail(booking)}
+            onTemplate={(type) => useTemplate(type, booking)}
           />
         ))}
       </div>
@@ -183,11 +296,12 @@ Agency signature: ${settings.agency_signature}`
   )
 }
 
-function BookingCard({ booking, expanded, onToggle, onDraftEmail }: {
+function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: {
   booking: HmsBooking
   expanded: boolean
   onToggle: () => void
   onDraftEmail: () => void
+  onTemplate: (type: 'availability' | 'confirm' | 'payment' | 'cancel') => void
 }) {
   const qc = useQueryClient()
   const hotel = (booking as any).hms_hotels
@@ -294,13 +408,32 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail }: {
             </div>
           )}
 
-          {/* Email actions */}
-          <button
-            onClick={onDraftEmail}
-            className="flex items-center gap-1 text-sm text-teal-600 border border-teal-300 rounded-lg px-3 py-1.5 hover:bg-teal-50"
-          >
-            <Mail size={14} /> Draft availability request
-          </button>
+          {/* Email templates */}
+          <div>
+            <div className="text-xs font-medium text-slate-500 mb-1.5">Email templates (instant, no AI needed)</div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => onTemplate('availability')}
+                className="flex items-center gap-1 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5 hover:bg-teal-100">
+                <Mail size={13} /> Availability request
+              </button>
+              <button onClick={() => onTemplate('confirm')}
+                className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100">
+                <Mail size={13} /> Confirm reservation
+              </button>
+              <button onClick={() => onTemplate('payment')}
+                className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-100">
+                <Mail size={13} /> Payment confirmation
+              </button>
+              <button onClick={() => onTemplate('cancel')}
+                className="flex items-center gap-1 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-100">
+                <Mail size={13} /> Cancellation request
+              </button>
+            </div>
+            <button onClick={onDraftEmail}
+              className="mt-2 flex items-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">
+              <Mail size={13} /> AI-written draft (requires Anthropic credits)
+            </button>
+          </div>
 
           {/* Email log */}
           <div>
