@@ -53,11 +53,11 @@ export default function DiscoveryScreen() {
 
     try {
       const query = `${starRating} star hotel ${area} ${destination}`
-      const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`
-
-      // Note: direct API call from browser requires proxy or CORS-enabled endpoint
-      // In production this should go through a Supabase Edge Function
-      const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`)
+      const res = await fetch('/api/search-places', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, apiKey }),
+      })
       const data = await res.json()
 
       if (!data.results) {
