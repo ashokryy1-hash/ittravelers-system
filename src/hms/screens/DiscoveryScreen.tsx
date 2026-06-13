@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Search, MapPin, Globe, Star, Plus, Mail, AlertCircle, CheckCircle } from 'lucide-react'
+import { Search, MapPin, Globe, Star, Plus, Mail, AlertCircle, CheckCircle, Edit2 } from 'lucide-react'
 import { getSettings } from '../lib/settings'
 import toast from 'react-hot-toast'
 import type { HmsOutreachHotel } from '../types'
@@ -16,7 +16,7 @@ interface PlaceResult {
   geometry?: { location: { lat: number; lng: number } }
   alreadyTracked?: boolean
   contactEmail?: string | null
-  emailStatus?: 'idle' | 'searching' | 'found' | 'not_found'
+  emailStatus?: 'idle' | 'searching' | 'found' | 'not_found' | 'manual'
 }
 
 export default function DiscoveryScreen() {
@@ -52,7 +52,9 @@ export default function DiscoveryScreen() {
     }
 
     try {
-      const query = `${starRating} star hotel ${area} ${destination}`
+      const query = starRating === 'boutique'
+        ? `boutique hotel ${area} ${destination}`
+        : `${starRating} star hotel ${area} ${destination}`
       const res = await fetch('/api/search-places', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -178,11 +180,12 @@ export default function DiscoveryScreen() {
             <input className={inp} placeholder="e.g. Uluwatu" value={area} onChange={e => setArea(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Star rating</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Hotel type</label>
             <select className={inp} value={starRating} onChange={e => setStarRating(e.target.value)}>
-              <option value="4">4 stars</option>
               <option value="5">5 stars</option>
+              <option value="4">4 stars</option>
               <option value="4 or 5">4 & 5 stars</option>
+              <option value="boutique">Boutique</option>
             </select>
           </div>
           <div className="flex items-end">
@@ -271,25 +274,67 @@ export default function DiscoveryScreen() {
                     {/* Email extraction */}
                     <div className="mt-2">
                       {place.emailStatus === 'idle' && (
-                        <button
-                          onClick={() => findEmail(place.place_id, place.website)}
-                          className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
-                        >
-                          <Mail size={11} /> Find contact email
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => findEmail(place.place_id, place.website)}
+                            className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
+                          >
+                            <Mail size={11} /> Find contact email
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            onClick={() => setResults(r => r.map(p => p.place_id === place.place_id ? { ...p, emailStatus: 'manual' } : p))}
+                            className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+                          >
+                            <Edit2 size={11} /> Add manually
+                          </button>
+                        </div>
+                      )}
+                      {place.emailStatus === 'manual' && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <input
+                            type="email"
+                            placeholder="email@hotel.com"
+                            className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-teal-400"
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                const val = (e.target as HTMLInputElement).value.trim()
+                                if (val) setResults(r => r.map(p => p.place_id === place.place_id ? { ...p, emailStatus: 'found', contactEmail: val } : p))
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <span className="text-xs text-slate-400">Enter to save</span>
+                        </div>
                       )}
                       {place.emailStatus === 'searching' && (
                         <span className="text-xs text-slate-400">Searching for email…</span>
                       )}
                       {place.emailStatus === 'found' && place.contactEmail && (
-                        <span className="flex items-center gap-1 text-xs text-teal-700">
-                          <CheckCircle size={11} /> {place.contactEmail}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1 text-xs text-teal-700">
+                            <CheckCircle size={11} /> {place.contactEmail}
+                          </span>
+                          <button
+                            onClick={() => setResults(r => r.map(p => p.place_id === place.place_id ? { ...p, emailStatus: 'manual', contactEmail: null } : p))}
+                            className="text-xs text-slate-400 hover:text-slate-600"
+                          >
+                            edit
+                          </button>
+                        </div>
                       )}
                       {place.emailStatus === 'not_found' && (
-                        <span className="flex items-center gap-1 text-xs text-slate-400">
-                          <AlertCircle size={11} /> Only general form found — add manually
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1 text-xs text-slate-400">
+                            <AlertCircle size={11} /> Not found
+                          </span>
+                          <button
+                            onClick={() => setResults(r => r.map(p => p.place_id === place.place_id ? { ...p, emailStatus: 'manual' } : p))}
+                            className="text-xs text-teal-600 hover:text-teal-700"
+                          >
+                            Add manually
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

@@ -62,81 +62,87 @@ export default function OutreachScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['hms_outreach_hotels'] }),
   })
 
-  async function draftOutreachEmail(hotel: HmsOutreachHotel, type: 'initial' | 'followup') {
-    const settings = await getSettings()
-    toast.loading('Generating email draft…', { id: 'draft' })
+  function buildOutreachTemplate(type: 'initial' | 'followup', hotel: HmsOutreachHotel, sig: string) {
+    const dest = (hotel as any).hms_destinations?.name ?? 'Bali'
+    if (type === 'initial') {
+      return {
+        subject: `Partnership Inquiry — ITTravelers × ${hotel.name}`,
+        body: `Dear Sales Team,
 
-    const systemPrompt = `You are a professional B2B email writer for ITTravelers, an Egyptian travel agency specializing in honeymoon trips to Southeast Asia.`
+I hope this message finds you well.
 
-    const userPrompt = type === 'initial'
-      ? `Write a professional initial outreach email to ${hotel.name} (a hotel in ${hotel.city}, ${(hotel as any).hms_destinations?.name ?? 'Bali'}).
+My name is Ahmed Shokry, Operations Manager at ITTravelers (InterTeam Travel), an Egyptian travel agency specialising exclusively in honeymoon trips to Southeast Asia.
 
-The email must:
-- Introduce ITTravelers as an Egyptian travel agency specializing in honeymoon trips to Southeast Asia
-- Mention our current Bali portfolio includes top properties like Ini Vie Hospitality and Pramana Group for credibility
-- State we are expanding and seeking new hotel partners
-- Position Egypt and the Middle East as our client market (strong selling point for hotels)
-- Request NET / contract / agent rates
-- Highlight our honeymoon specialization
-- Reference the specific hotel name and destination
-- End with our signature
+We work with a growing portfolio of Egyptian and Middle Eastern couples planning their honeymoon in ${dest}, and we are currently expanding our preferred hotel partners in the region.
 
-Agency signature: ${settings.agency_signature}
+We already have strong partnerships with top properties through Ini Vie Hospitality and Pramana Group, and we believe ${hotel.name} would be an excellent addition to our collection.
 
-Tone: warm, professional B2B. Keep it concise.`
-      : `Write a polite follow-up email to ${hotel.name} (a hotel in ${hotel.city}).
+We would love to explore a partnership and kindly request your NET / agent rates or contracted rates for our consideration.
 
-Context: We sent an initial outreach email on ${hotel.last_contact_date ?? hotel.date_added} and have not received a reply.
+Our clients are high-value honeymoon couples who typically book superior rooms and suites, and Egypt & the Middle East represent a strong and growing market for your property.
 
-The follow-up must:
-- Reference our previous email politely
-- Reiterate our interest in partnering with them
-- Be brief and friendly
-- End with our signature
+Please feel free to reply to this email or share your rate sheet at your convenience. We look forward to a long and fruitful partnership.
 
-Agency signature: ${settings.agency_signature}
+${sig}`,
+      }
+    }
+    return {
+      subject: `Following Up — ITTravelers Partnership Inquiry | ${hotel.name}`,
+      body: `Dear Sales Team,
 
-Tone: polite, professional.`
+I hope you are doing well.
 
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY ?? '',
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
-        }),
-      })
-      const data = await res.json()
-      const body = data.content?.[0]?.text ?? ''
-      const subjectLine = type === 'initial'
-        ? `Partnership Inquiry — ITTravelers × ${hotel.name}`
-        : `Following up — ITTravelers Partnership Inquiry`
+I am writing to follow up on my previous email regarding a potential partnership between ITTravelers and ${hotel.name}.
 
-      toast.dismiss('draft')
-      setEmailDraft({
-        to: hotel.contact_email ?? '',
-        subject: subjectLine,
-        body,
-        hotelId: hotel.id,
-        type,
-      })
-    } catch {
-      toast.dismiss('draft')
-      toast.error('Failed to generate draft. Check your API key in settings.')
+We remain very interested in featuring your property in our honeymoon packages for Egyptian and Middle Eastern clients, and would love to receive your agent / NET rates at your earliest convenience.
+
+Please do not hesitate to reach out if you need any further information about our agency.
+
+${sig}`,
     }
   }
 
-  async function sendEmail(subject: string, body: string) {
+  async function useOutreachTemplate(type: 'initial' | 'followup', hotel: HmsOutreachHotel) {
+    const settings = await getSettings()
+    const sig = settings.agency_signature || 'ITTravelers\nAhmed Shokry – Operations Manager'
+    const { subject, body } = buildOutreachTemplate(type, hotel, sig)
+    setEmailDraft({ to: hotel.contact_email ?? '', subject, body, hotelId: hotel.id, type })
+  }
+
+  async function draftOutreachEmail(hotel: HmsOutreachHotel, type: 'initial' | 'followup') {
+    const settings = await getSettings()
+    toast.loading('Generating AI draft…', { id: 'draft' })
+
+    const dest = (hotel as any).hms_destinations?.name ?? 'Bali'
+    const prompt = type === 'initial'
+      ? `Write a professional initial outreach email to ${hotel.name} (a hotel in ${hotel.city}, ${dest}).
+The email must: introduce ITTravelers as an Egyptian honeymoon travel agency, mention our Bali portfolio (Ini Vie Hospitality and Pramana Group), request NET/agent rates, highlight our honeymoon specialisation and the Egypt/Middle East market as a strong client base. Be warm, professional, concise.
+Agency signature: ${settings.agency_signature}`
+      : `Write a polite follow-up email to ${hotel.name} (${hotel.city}). Reference our previous outreach. Reiterate interest in partnering. Brief and friendly.
+Agency signature: ${settings.agency_signature}`
+
+    try {
+      const res = await fetch('/api/draft-email', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      const subject = type === 'initial'
+        ? `Partnership Inquiry — ITTravelers × ${hotel.name}`
+        : `Following Up — ITTravelers Partnership Inquiry | ${hotel.name}`
+      toast.dismiss('draft')
+      setEmailDraft({ to: hotel.contact_email ?? '', subject, body: data.text ?? '', hotelId: hotel.id, type })
+    } catch {
+      toast.dismiss('draft')
+      toast.error('Failed to generate AI draft. Add Anthropic credits or use the template instead.')
+    }
+  }
+
+  async function sendEmail(subject: string, body: string, to: string) {
     if (!emailDraft) return
     setSendingEmail(true)
-    // Log the email as sent
     await supabase.from('hms_outreach_emails').insert({
       hotel_id: emailDraft.hotelId,
       direction: 'sent',
@@ -149,17 +155,14 @@ Tone: polite, professional.`
       stage: emailDraft.type === 'initial' ? 'Contacted' : undefined,
     }).eq('id', emailDraft.hotelId)
 
-    // Microsoft Graph API send
     try {
       const settings = await getSettings()
       await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emailDraft.to, subject, body, senderName: settings.outlook_sender_name }),
+        body: JSON.stringify({ to, subject, body, senderName: settings.outlook_sender_name }),
       })
-    } catch {
-      // Log failure but don't block — email is still recorded
-    }
+    } catch {}
 
     qc.invalidateQueries({ queryKey: ['hms_outreach_hotels'] })
     qc.invalidateQueries({ queryKey: ['hms_emails', emailDraft.hotelId] })
@@ -200,6 +203,7 @@ Tone: polite, professional.`
                     onToggle={() => setOpenCard(openCard === hotel.id ? null : hotel.id)}
                     onStageChange={(s) => updateStage.mutate({ id: hotel.id, stage: s as Stage })}
                     onDraftEmail={(type) => draftOutreachEmail(hotel, type)}
+                    onTemplate={(type) => useOutreachTemplate(type, hotel)}
                     stages={STAGES}
                   />
                 ))}
@@ -225,6 +229,7 @@ Tone: polite, professional.`
                 onToggle={() => setOpenCard(openCard === hotel.id ? null : hotel.id)}
                 onStageChange={(s) => updateStage.mutate({ id: hotel.id, stage: s as Stage })}
                 onDraftEmail={() => {}}
+                onTemplate={() => {}}
                 stages={STAGES}
               />
             ))}
@@ -254,12 +259,13 @@ Tone: polite, professional.`
   )
 }
 
-function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, stages }: {
+function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onTemplate, stages }: {
   hotel: HmsOutreachHotel
   expanded: boolean
   onToggle: () => void
   onStageChange: (stage: string) => void
   onDraftEmail: (type: 'initial' | 'followup') => void
+  onTemplate: (type: 'initial' | 'followup') => void
   stages: readonly string[]
 }) {
   const qc = useQueryClient()
@@ -343,20 +349,36 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, sta
           {/* Email actions */}
           <div className="space-y-1.5">
             {hotel.stage === 'Prospect' && (
-              <button
-                onClick={() => onDraftEmail('initial')}
-                className="w-full flex items-center justify-center gap-1 text-xs bg-teal-600 text-white rounded-lg py-1.5 hover:bg-teal-700"
-              >
-                <Mail size={12} /> Draft outreach email
-              </button>
+              <>
+                <div className="text-xs font-medium text-slate-400 mb-1">Email templates (instant)</div>
+                <button
+                  onClick={() => onTemplate('initial')}
+                  className="w-full flex items-center justify-center gap-1 text-xs bg-teal-600 text-white rounded-lg py-1.5 hover:bg-teal-700"
+                >
+                  <Mail size={12} /> Partnership outreach
+                </button>
+                <button
+                  onClick={() => onDraftEmail('initial')}
+                  className="w-full flex items-center justify-center gap-1 text-xs border border-slate-200 text-slate-500 rounded-lg py-1.5 hover:bg-slate-50"
+                >
+                  <Mail size={12} /> AI-written draft (requires credits)
+                </button>
+              </>
             )}
             {(hotel.stage === 'Contacted' || hotel.stage === 'Replied' || hotel.stage === 'Negotiating') && (
               <>
+                <div className="text-xs font-medium text-slate-400 mb-1">Email templates (instant)</div>
+                <button
+                  onClick={() => onTemplate('followup')}
+                  className="w-full flex items-center justify-center gap-1 text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700"
+                >
+                  <Send size={12} /> Follow-up
+                </button>
                 <button
                   onClick={() => onDraftEmail('followup')}
-                  className="w-full flex items-center justify-center gap-1 text-xs border border-teal-300 text-teal-700 rounded-lg py-1.5 hover:bg-teal-50"
+                  className="w-full flex items-center justify-center gap-1 text-xs border border-slate-200 text-slate-500 rounded-lg py-1.5 hover:bg-slate-50"
                 >
-                  <Send size={12} /> Draft follow-up
+                  <Mail size={12} /> AI-written draft (requires credits)
                 </button>
               </>
             )}
