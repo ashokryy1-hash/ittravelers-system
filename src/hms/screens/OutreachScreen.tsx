@@ -389,6 +389,15 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
   const [showEmailLog, setShowEmailLog] = useState(false)
   const [incomingEmail, setIncomingEmail] = useState('')
   const [incomingSubject, setIncomingSubject] = useState('')
+  const [editingEmail, setEditingEmail] = useState(false)
+  const [contactEmail, setContactEmail] = useState(hotel.contact_email ?? '')
+
+  async function saveContactEmail() {
+    await supabase.from('hms_outreach_hotels').update({ contact_email: contactEmail }).eq('id', hotel.id)
+    qc.invalidateQueries({ queryKey: ['hms_outreach_hotels'] })
+    setEditingEmail(false)
+    toast.success('Email saved')
+  }
 
   const { data: emails } = useQuery<HmsOutreachEmail[]>({
     queryKey: ['hms_emails', hotel.id],
@@ -440,13 +449,30 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
             {hotel.google_maps_url && <a href={hotel.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Maps</a>}
           </div>
 
-          {/* Contact */}
-          {(hotel.contact_name || hotel.contact_email) && (
-            <div className="text-xs text-slate-600">
-              {hotel.contact_name && <div>{hotel.contact_name}</div>}
-              {hotel.contact_email && <div className="text-blue-600">{hotel.contact_email}</div>}
-            </div>
-          )}
+          {/* Contact email — always editable */}
+          <div className="text-xs">
+            {hotel.contact_name && <div className="text-slate-600 mb-1">{hotel.contact_name}</div>}
+            {editingEmail ? (
+              <div className="flex gap-1">
+                <input
+                  type="email"
+                  autoFocus
+                  value={contactEmail}
+                  onChange={e => setContactEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveContactEmail()}
+                  placeholder="hotel@email.com"
+                  className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+                />
+                <button onClick={saveContactEmail} className="text-xs bg-teal-600 text-white rounded px-2 py-1 hover:bg-teal-700">Save</button>
+                <button onClick={() => setEditingEmail(false)} className="text-xs text-slate-400 hover:text-slate-600 px-1">✕</button>
+              </div>
+            ) : (
+              <button onClick={() => setEditingEmail(true)} className="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+                <Mail size={11} />
+                {contactEmail || <span className="text-slate-400 italic">Add contact email</span>}
+              </button>
+            )}
+          </div>
 
           {/* Notes */}
           {hotel.notes && <p className="text-xs text-slate-500 italic">{hotel.notes}</p>}
