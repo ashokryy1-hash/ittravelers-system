@@ -323,14 +323,12 @@ function SalesQuoteCard({ result, checkin, checkout, usdRate }: { result: RateQu
   const perNightUsd = totalUsd / nights
 
   function buildWhatsApp(): string {
-    const idrTotal = Math.round(totalStay).toLocaleString()
-    const usdTotal = totalUsd.toFixed(0)
     return `🏨 *${hotel.name}*
 📍 ${hotel.city}, ${(hotel as any).hms_destinations?.name ?? 'Bali'}
 🛏 ${roomType.name} (${roomType.meal_plan})
 📅 ${checkin} → ${checkout} (${nights} nights)
 ✨ Season: ${seasonLabel(season)}
-💰 ${currency} ${idrTotal} total ≈ USD ${Number(usdTotal).toLocaleString()}${roomType.notes ? `\n✅ Includes: ${roomType.notes}` : ''}
+💰 ${currency} ${Math.round(totalStay).toLocaleString()} total${roomType.notes ? `\n✅ Includes: ${roomType.notes}` : ''}
 
 For bookings & inquiries: Ittravelers.com`
   }
@@ -364,7 +362,7 @@ For bookings & inquiries: Ittravelers.com`
         </button>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div>
           <div className="text-xs text-slate-400">Per night ({currency})</div>
           <div className="font-bold text-slate-800">{currency} {Math.round(totalPerNight).toLocaleString()}</div>
@@ -374,14 +372,6 @@ For bookings & inquiries: Ittravelers.com`
           <div className="font-bold text-teal-700 text-base">{currency} {Math.round(totalStay).toLocaleString()}</div>
         </div>
         <div>
-          <div className="text-xs text-slate-400">Per night (USD)</div>
-          <div className="font-bold text-slate-800">USD {perNightUsd.toFixed(0)}</div>
-        </div>
-        <div>
-          <div className="text-xs text-slate-400">Total {nights}n (USD)</div>
-          <div className="font-bold text-teal-700 text-base">USD {Math.round(totalUsd).toLocaleString()}</div>
-        </div>
-        <div className="col-span-2 sm:col-span-1">
           <div className="text-xs text-slate-400">Season</div>
           <div className="text-sm font-medium text-slate-600 capitalize">{seasonLabel(season)}</div>
         </div>
