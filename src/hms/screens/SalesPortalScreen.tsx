@@ -77,6 +77,7 @@ function QuoteTool() {
   const [area, setArea] = useState('')
   const [results, setResults] = useState<RateQuoteResult[] | null>(null)
   const [searching, setSearching] = useState(false)
+  const [usdRate, setUsdRate] = useState(16000) // IDR per 1 USD fallback
 
   const { data: hotels } = useQuery<HmsHotel[]>({
     queryKey: ['hms_hotels_sales'],
@@ -110,6 +111,10 @@ function QuoteTool() {
     setSearching(true)
     const settings = await getSettings()
     const idrToEgp = parseFloat(settings.IDR_to_EGP)
+    const usdToEgp = parseFloat(settings.USD_to_EGP)
+    // IDR per USD = (IDR→EGP rate) / (USD→EGP rate) inverted
+    // e.g. 1 USD = 50 EGP, 1 IDR = 0.0018 EGP → 1 USD = 50/0.0018 ≈ 27,778 IDR
+    if (idrToEgp > 0 && usdToEgp > 0) setUsdRate(usdToEgp / idrToEgp)
     const nights = nightsBetween(checkin, checkout)
     if (nights <= 0) { toast.error('Check-out must be after check-in'); setSearching(false); return }
 
@@ -136,7 +141,7 @@ function QuoteTool() {
         if (!baseRate) continue
 
         const surcharge = getSurcharge(season, rule, room.room_category as 'room' | 'villa', hotel.surcharge_waiver)
-        const totalPerNight = baseRate + surcharge
+        const totalPerNight = (baseRate + surcharge) * 1.05  // 5% margin
         const totalStay = totalPerNight * nights
 
         let totalEgp = 0
@@ -223,7 +228,7 @@ function QuoteTool() {
             )}
             <div className="space-y-3">
               {results.map((r, i) => (
-                <SalesQuoteCard key={i} result={r} checkin={checkin} checkout={checkout} />
+                <SalesQuoteCard key={i} result={r} checkin={checkin} checkout={checkout} usdRate={usdRate} />
               ))}
             </div>
           </div>
@@ -240,16 +245,28 @@ function QuoteTool() {
   )
 }
 
-function SalesQuoteCard({ result, checkin, checkout }: { result: RateQuoteResult; checkin: string; checkout: string }) {
-  const { hotel, roomType, season, totalEgp, nights } = result
+function SalesQuoteCard({ result, checkin, checkout, usdRate }: { result: RateQuoteResult; checkin: string; checkout: string; usdRate: number }) {
+  const { hotel, roomType, season, totalPerNight, totalStay, nights } = result
+  const currency = roomType.currency
+
+  // totalPerNight and totalStay already include 5% markup
+  const totalUsd = currency === 'USD'
+    ? totalStay
+    : currency === 'IDR'
+      ? totalStay / (usdRate > 0 ? usdRate : 16000)
+      : totalStay / (usdRate > 0 ? usdRate : 16000)  // fallback for THB
+
+  const perNightUsd = totalUsd / nights
 
   function buildWhatsApp(): string {
+    const idrTotal = Math.round(totalStay).toLocaleString()
+    const usdTotal = totalUsd.toFixed(0)
     return `🏨 *${hotel.name}*
 📍 ${hotel.city}, ${(hotel as any).hms_destinations?.name ?? 'Bali'}
 🛏 ${roomType.name} (${roomType.meal_plan})
 📅 ${checkin} → ${checkout} (${nights} nights)
 ✨ Season: ${seasonLabel(season)}
-💰 Total: EGP ${Math.round(totalEgp).toLocaleString()}${roomType.notes ? `\n✅ Includes: ${roomType.notes}` : ''}
+💰 ${currency} ${idrTotal} total ≈ USD ${Number(usdTotal).toLocaleString()}${roomType.notes ? `\n✅ Includes: ${roomType.notes}` : ''}
 
 For bookings & inquiries: Ittravelers.com`
   }
@@ -258,8 +275,6 @@ For bookings & inquiries: Ittravelers.com`
     navigator.clipboard.writeText(buildWhatsApp())
     toast.success('Quote copied — ready to paste into WhatsApp')
   }
-
-  const egpPerNight = Math.round(totalEgp / nights)
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-teal-300 transition-colors">
@@ -285,16 +300,24 @@ For bookings & inquiries: Ittravelers.com`
         </button>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-6">
+      <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div>
-          <div className="text-xs text-slate-400">Per night</div>
-          <div className="font-bold text-slate-800">EGP {egpPerNight.toLocaleString()}</div>
+          <div className="text-xs text-slate-400">Per night ({currency})</div>
+          <div className="font-bold text-slate-800">{currency} {Math.round(totalPerNight).toLocaleString()}</div>
         </div>
         <div>
-          <div className="text-xs text-slate-400">Total ({nights} nights)</div>
-          <div className="font-bold text-teal-700 text-lg">EGP {Math.round(totalEgp).toLocaleString()}</div>
+          <div className="text-xs text-slate-400">Total {nights}n ({currency})</div>
+          <div className="font-bold text-teal-700 text-base">{currency} {Math.round(totalStay).toLocaleString()}</div>
         </div>
         <div>
+          <div className="text-xs text-slate-400">Per night (USD)</div>
+          <div className="font-bold text-slate-800">USD {perNightUsd.toFixed(0)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-slate-400">Total {nights}n (USD)</div>
+          <div className="font-bold text-teal-700 text-base">USD {Math.round(totalUsd).toLocaleString()}</div>
+        </div>
+        <div className="col-span-2 sm:col-span-1">
           <div className="text-xs text-slate-400">Season</div>
           <div className="text-sm font-medium text-slate-600 capitalize">{seasonLabel(season)}</div>
         </div>
