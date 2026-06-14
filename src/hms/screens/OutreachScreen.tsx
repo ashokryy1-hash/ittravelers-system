@@ -268,12 +268,18 @@ Agency signature: ${settings.agency_signature}`
 
     try {
       const settings = await getSettings()
-      await fetch('/api/send-email', {
+      const sendRes = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to, subject, body, senderName: settings.outlook_sender_name }),
       })
-    } catch {}
+      if (!sendRes.ok) {
+        const err = await sendRes.json()
+        toast.error(`Email logged but not sent: ${err.error}`)
+      }
+    } catch (e: any) {
+      toast.error(`Email logged but not sent: ${e?.message}`)
+    }
 
     qc.invalidateQueries({ queryKey: ['hms_outreach_hotels'] })
     qc.invalidateQueries({ queryKey: ['hms_emails', emailDraft.hotelId] })

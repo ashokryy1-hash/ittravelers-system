@@ -27,16 +27,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pass: senderPassword,
     },
     tls: {
-      ciphers: 'SSLv3',
+      rejectUnauthorized: false,
     },
   })
 
-  await transporter.sendMail({
-    from: `"${senderName ?? 'ITTravelers'}" <${senderEmail}>`,
-    to,
-    subject,
-    text: body,
-  })
-
-  return res.status(200).json({ success: true })
+  try {
+    await transporter.sendMail({
+      from: `"${senderName ?? 'ITTravelers'}" <${senderEmail}>`,
+      to,
+      subject,
+      text: body,
+    })
+    return res.status(200).json({ success: true })
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message ?? 'Failed to send email' })
+  }
 }
