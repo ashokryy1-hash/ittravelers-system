@@ -200,7 +200,7 @@ function QuoteTool() {
           <div>
             <div className="text-xs font-medium text-gray-500 mb-2">Destination</div>
             <div className="flex gap-2">
-              {['Bali', 'Thailand', 'Vietnam'].map(d => (
+              {['Bali'].map(d => (
                 <button key={d} onClick={() => { setDestination(d); setArea('') }}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${destination === d ? 'bg-teal-600 text-white border-teal-600' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
                   {d}
