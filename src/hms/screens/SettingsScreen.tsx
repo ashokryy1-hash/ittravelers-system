@@ -68,6 +68,12 @@ export default function SettingsScreen() {
         </Field>
       </Section>
 
+      <Section title="Sales Portal">
+        <Field label="Sales portal PIN" description={`Share the link ittravelers-system.vercel.app/sales with your sales team — they enter this PIN to access rates`}>
+          <input type="text" maxLength={6} className={inp} value={form.sales_pin ?? ''} onChange={set('sales_pin' as any)} placeholder="e.g. 1234" />
+        </Field>
+      </Section>
+
       <Section title="Reminders">
         <Field label="Default follow-up reminder (days)" description="How many days after outreach to set a follow-up reminder">
           <input type="number" className={inp} value={form.followup_reminder_days} onChange={set('followup_reminder_days')} />

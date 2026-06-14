@@ -18,6 +18,7 @@ import RatesScreen from './hms/screens/RatesScreen'
 import RateViewerScreen from './hms/screens/RateViewerScreen'
 import ReservationsScreen from './hms/screens/ReservationsScreen'
 import SettingsScreen from './hms/screens/SettingsScreen'
+import SalesPortalScreen from './hms/screens/SalesPortalScreen'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +41,9 @@ export default function App() {
             <Route path="/bali/:cityId" element={<AreaScreen />} />
             <Route path="/summary" element={<SummaryScreen />} />
             <Route path="/admin" element={<AdminScreen />} />
+
+            {/* Sales team rate portal — PIN protected, no HMS login needed */}
+            <Route path="/sales" element={<SalesPortalScreen />} />
 
             {/* Internal Hotel Management System */}
             <Route path="/hms" element={<HmsRoot />}>
