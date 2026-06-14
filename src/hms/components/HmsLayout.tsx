@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Search, GitMerge, Building2, CalendarCheck,
-  Settings, LayoutDashboard, LogOut, Menu, X
+  Settings, LayoutDashboard, LogOut, Menu, X, Map
 } from 'lucide-react'
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -12,6 +12,7 @@ const NAV = [
   { to: '/hms/outreach', label: 'Outreach', icon: GitMerge },
   { to: '/hms/rates', label: 'Rates', icon: Building2 },
   { to: '/hms/reservations', label: 'Reservations', icon: CalendarCheck },
+  { to: '/hms/tours', label: 'Tours', icon: Map },
   { to: '/hms/settings', label: 'Settings', icon: Settings },
 ]
 

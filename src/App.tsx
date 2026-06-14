@@ -19,6 +19,7 @@ import RateViewerScreen from './hms/screens/RateViewerScreen'
 import ReservationsScreen from './hms/screens/ReservationsScreen'
 import SettingsScreen from './hms/screens/SettingsScreen'
 import SalesPortalScreen from './hms/screens/SalesPortalScreen'
+import ToursScreen from './hms/screens/ToursScreen'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +55,7 @@ export default function App() {
                 <Route path="rates" element={<RatesScreen />} />
                 <Route path="rates/quote" element={<RateViewerScreen />} />
                 <Route path="reservations" element={<ReservationsScreen />} />
+                <Route path="tours" element={<ToursScreen />} />
                 <Route path="settings" element={<SettingsScreen />} />
               </Route>
             </Route>
