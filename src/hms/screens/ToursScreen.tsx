@@ -441,6 +441,10 @@ function LibraryTab() {
   const [newName, setNewName] = useState('')
   const [newIcon, setNewIcon] = useState('🌴')
   const [newActivities, setNewActivities] = useState<ActivityItem[]>([{ time: '', description: '' }])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editIcon, setEditIcon] = useState('')
+  const [editActivities, setEditActivities] = useState<ActivityItem[]>([])
 
   const { data: templates = [] } = useQuery<ActivityTemplate[]>({
     queryKey: ['hms_activity_templates'],
@@ -464,6 +468,30 @@ function LibraryTab() {
     setNewIcon('🌴')
     setNewActivities([{ time: '', description: '' }])
     toast.success('Template saved')
+  }
+
+  function startEdit(t: ActivityTemplate) {
+    setEditingId(t.id)
+    setEditName(t.name)
+    setEditIcon(t.icon)
+    setEditActivities(t.activities.map(a => ({ ...a })))
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  async function saveEdit(id: string) {
+    if (!editName.trim()) return toast.error('Name required')
+    const acts = editActivities.filter(a => a.description.trim())
+    const { error } = await supabase
+      .from('hms_activity_templates')
+      .update({ name: editName.trim(), icon: editIcon, activities: acts })
+      .eq('id', id)
+    if (error) return toast.error(error.message)
+    qc.invalidateQueries({ queryKey: ['hms_activity_templates'] })
+    setEditingId(null)
+    toast.success('Template updated')
   }
 
   async function deleteTemplate(id: string) {
@@ -527,19 +555,68 @@ function LibraryTab() {
       <div className="space-y-3">
         {templates.map(t => (
           <div key={t.id} className="border border-gray-200 rounded-xl bg-white p-4">
-            <div className="flex items-start justify-between">
-              <div className="font-semibold text-slate-700">{t.icon} {t.name}</div>
-              <button onClick={() => deleteTemplate(t.id)} className="text-slate-400 hover:text-red-500 p-1">
-                <Trash2 size={13} />
-              </button>
-            </div>
-            <div className="mt-2 space-y-0.5">
-              {t.activities.map((act, i) => (
-                <div key={i} className="text-sm text-slate-600">
-                  <span className="font-mono text-slate-400 mr-2">{act.time}</span>{act.description}
+            {editingId === t.id ? (
+              /* ── Edit mode ── */
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input value={editIcon} onChange={e => setEditIcon(e.target.value)} className={`${inp} w-16 text-center`} />
+                  <input value={editName} onChange={e => setEditName(e.target.value)} className={inp} placeholder="Template name" />
                 </div>
-              ))}
-            </div>
+                <div className="space-y-2">
+                  {editActivities.map((act, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        value={act.time}
+                        onChange={e => setEditActivities(a => a.map((x, j) => j === i ? { ...x, time: e.target.value } : x))}
+                        className={`${inp} w-24`}
+                        placeholder="09:00"
+                      />
+                      <input
+                        value={act.description}
+                        onChange={e => setEditActivities(a => a.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
+                        className={inp}
+                        placeholder="Activity description"
+                      />
+                      <button onClick={() => setEditActivities(a => a.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-500">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setEditActivities(a => [...a, { time: '', description: '' }])}
+                    className="text-xs text-teal-600 hover:underline"
+                  >
+                    + Add activity
+                  </button>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={cancelEdit} className="text-sm text-slate-500 px-3 py-1.5">Cancel</button>
+                  <button onClick={() => saveEdit(t.id)} className="bg-teal-600 text-white text-sm rounded-lg px-4 py-1.5 hover:bg-teal-700">Save</button>
+                </div>
+              </div>
+            ) : (
+              /* ── View mode ── */
+              <>
+                <div className="flex items-start justify-between">
+                  <div className="font-semibold text-slate-700">{t.icon} {t.name}</div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => startEdit(t)} className="text-slate-400 hover:text-teal-600 p-1" title="Edit template">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => deleteTemplate(t.id)} className="text-slate-400 hover:text-red-500 p-1">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-2 space-y-0.5">
+                  {t.activities.map((act, i) => (
+                    <div key={i} className="text-sm text-slate-600">
+                      <span className="font-mono text-slate-400 mr-2">{act.time}</span>{act.description}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
