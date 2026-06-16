@@ -258,11 +258,13 @@ Agency signature: ${settings.agency_signature}`
   const pendingCount = (bookings ?? []).filter(b => b.status === 'Availability pending').length
   const confirmedCount = (bookings ?? []).filter(b => b.status === 'Confirmed').length
 
-  // Group bookings by client name for the Clients view
-  const clientGroups = filtered.reduce<Record<string, HmsBooking[]>>((acc, b) => {
-    const name = b.client_name || 'Unknown'
-    if (!acc[name]) acc[name] = []
-    acc[name].push(b)
+  // Group bookings by client name for the Clients view (normalize: trim + title-case for deduplication)
+  const normalizeClientName = (name: string) => name.trim().toLowerCase()
+  const clientGroups = filtered.reduce<Record<string, { displayName: string; bookings: HmsBooking[] }>>((acc, b) => {
+    const raw = b.client_name || 'Unknown'
+    const key = normalizeClientName(raw)
+    if (!acc[key]) acc[key] = { displayName: raw.trim(), bookings: [] }
+    acc[key].bookings.push(b)
     return acc
   }, {})
 
@@ -344,8 +346,8 @@ Agency signature: ${settings.agency_signature}`
           {Object.keys(clientGroups).length === 0 && (
             <div className="text-center py-12 text-slate-400">No clients found.</div>
           )}
-          {Object.entries(clientGroups).sort(([a], [b]) => a.localeCompare(b)).map(([clientName, clientBookings]) => {
-            const isOpen = openClient === clientName
+          {Object.entries(clientGroups).sort(([a], [b]) => a.localeCompare(b)).map(([key, { displayName, bookings: clientBookings }]) => {
+            const isOpen = openClient === key
             const statusCounts = clientBookings.reduce<Record<string, number>>((acc, b) => {
               acc[b.status] = (acc[b.status] ?? 0) + 1
               return acc
@@ -353,17 +355,17 @@ Agency signature: ${settings.agency_signature}`
             const hasPending = (statusCounts['Availability pending'] ?? 0) > 0
 
             return (
-              <div key={clientName} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div key={key} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <button
                   className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                  onClick={() => setOpenClient(isOpen ? null : clientName)}
+                  onClick={() => setOpenClient(isOpen ? null : key)}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-sm font-bold shrink-0">
-                      {clientName.charAt(0).toUpperCase()}
+                      {displayName.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <div className="font-medium text-slate-800">{clientName}</div>
+                      <div className="font-medium text-slate-800">{displayName}</div>
                       <div className="text-xs text-slate-500 mt-0.5">
                         {clientBookings.length} booking{clientBookings.length !== 1 ? 's' : ''}
                         {Object.entries(statusCounts).map(([s, n]) => (
@@ -397,6 +399,7 @@ Agency signature: ${settings.agency_signature}`
 
       {showForm && (
         <BookingForm
+          existingClients={[...new Set((bookings ?? []).map(b => b.client_name?.trim()).filter(Boolean))] as string[]}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['hms_bookings'] }) }}
         />
@@ -677,7 +680,7 @@ function Detail({ label, value }: { label: string; value: string | null | undefi
 }
 
 // ---- Booking Form ----
-function BookingForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => void; onSaved: () => void; existingClients: string[] }) {
   const [form, setForm] = useState({
     client_name: '', hotel_id: '', room_type_id: '',
     checkin_date: '', checkout_date: '', meal_plan: '',
@@ -746,7 +749,16 @@ function BookingForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
       <div className="space-y-3">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Client name *</label>
-          <input className={inp} value={form.client_name} onChange={set('client_name')} />
+          <input
+            className={inp}
+            list="existing-clients"
+            placeholder="Type or select existing client…"
+            value={form.client_name}
+            onChange={set('client_name')}
+          />
+          <datalist id="existing-clients">
+            {existingClients.sort().map(name => <option key={name} value={name} />)}
+          </datalist>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Hotel *</label>
