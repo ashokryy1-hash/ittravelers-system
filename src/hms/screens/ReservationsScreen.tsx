@@ -737,6 +737,7 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
     status: 'Availability pending',
   })
   const [saving, setSaving] = useState(false)
+  const [detectedSeason, setDetectedSeason] = useState<'low' | 'high' | 'peak'>('low')
 
   const { data: hotels } = useQuery<HmsHotel[]>({
     queryKey: ['hms_hotels_booking'],
@@ -755,19 +756,51 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
     enabled: !!form.hotel_id,
   })
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }))
+  const { data: surchargeRules } = useQuery<HmsSurchargeRule[]>({
+    queryKey: ['hms_surcharge_rules_form', form.hotel_id],
+    queryFn: async () => {
+      const hotel = hotels?.find(h => h.id === form.hotel_id)
+      if (!hotel?.destination_id) return []
+      const { data } = await supabase.from('hms_surcharge_rules').select('*').eq('destination_id', hotel.destination_id)
+      return data ?? []
+    },
+    enabled: !!form.hotel_id && !!hotels,
+  })
 
-  function handleRoomSelect(e: React.ChangeEvent<HTMLSelectElement>) {
-    const roomId = e.target.value
+  function getRateForSeason(room: HmsRoomType, season: 'low' | 'high' | 'peak'): string {
+    if (season === 'peak' && room.peak_season_rate) return String(room.peak_season_rate)
+    if (season === 'high' && room.high_season_rate) return String(room.high_season_rate)
+    return room.low_season_rate ? String(room.low_season_rate) : ''
+  }
+
+  function applySeasonRate(roomId: string, checkin: string) {
     const room = rooms?.find(r => r.id === roomId)
+    if (!room) return
+    let season: 'low' | 'high' | 'peak' = 'low'
+    if (checkin && surchargeRules && surchargeRules.length > 0) {
+      const { season: s } = getSeasonForStay(checkin, checkin, surchargeRules)
+      season = s
+    }
+    setDetectedSeason(season)
     setForm(f => ({
       ...f,
       room_type_id: roomId,
-      meal_plan: room?.meal_plan ?? f.meal_plan,
-      currency: room?.currency ?? f.currency,
-      rate_per_night: room?.low_season_rate ? String(room.low_season_rate) : f.rate_per_night,
+      meal_plan: room.meal_plan ?? f.meal_plan,
+      currency: room.currency ?? f.currency,
+      rate_per_night: getRateForSeason(room, season),
     }))
+  }
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const value = e.target.value
+    setForm(f => ({ ...f, [k]: value }))
+    // Re-apply season rate when check-in date changes and a room is already selected
+    if (k === 'checkin_date' && form.room_type_id) {
+      applySeasonRate(form.room_type_id, value)
+    }
+  }
+
+  function handleRoomSelect(e: React.ChangeEvent<HTMLSelectElement>) {
+    applySeasonRate(e.target.value, form.checkin_date)
   }
 
   async function save() {
@@ -836,7 +869,18 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
           </div>
         </div>
         {form.checkin_date && form.checkout_date && (
-          <p className="text-xs text-slate-500">{nightsBetween(form.checkin_date, form.checkout_date)} nights</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-slate-500">{nightsBetween(form.checkin_date, form.checkout_date)} nights</p>
+            {form.room_type_id && (
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                detectedSeason === 'peak' ? 'bg-red-100 text-red-700' :
+                detectedSeason === 'high' ? 'bg-orange-100 text-orange-700' :
+                'bg-blue-100 text-blue-700'
+              }`}>
+                {seasonLabel(detectedSeason)} Season
+              </span>
+            )}
+          </div>
         )}
         <div className="grid grid-cols-2 gap-3">
           <div>
