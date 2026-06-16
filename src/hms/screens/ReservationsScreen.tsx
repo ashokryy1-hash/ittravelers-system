@@ -430,6 +430,8 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
   const [incomingSubject, setIncomingSubject] = useState('')
   const [confirmNumber, setConfirmNumber] = useState(booking.hotel_confirmation_number ?? '')
   const [cutoffDate, setCutoffDate] = useState(booking.cutoff_date ?? '')
+  const [editingName, setEditingName] = useState(false)
+  const [clientName, setClientName] = useState(booking.client_name ?? '')
 
   const cutoffDays = daysUntil(booking.cutoff_date)
   const showCutoffWarning = cutoffDays !== null && cutoffDays <= 14 && booking.status !== 'Paid' && booking.status !== 'Cancelled'
@@ -454,6 +456,14 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
     onSuccess: () => qc.invalidateQueries({ queryKey: ['hms_bookings'] }),
   })
 
+  async function saveClientName() {
+    if (!clientName.trim()) return
+    await supabase.from('hms_bookings').update({ client_name: clientName.trim() }).eq('id', booking.id)
+    qc.invalidateQueries({ queryKey: ['hms_bookings'] })
+    setEditingName(false)
+    toast.success('Client name updated')
+  }
+
   async function logIncoming() {
     if (!incomingEmail.trim()) return
     await supabase.from('hms_booking_emails').insert({
@@ -474,7 +484,7 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
         <div className="flex items-center justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-slate-800">{booking.client_name}</span>
+              <span className="font-medium text-slate-800">{clientName || booking.client_name}</span>
               <span className="text-sm text-slate-500">{hotel?.name} · {hotel?.city}</span>
             </div>
             <div className="text-xs text-slate-400 mt-0.5">
@@ -498,6 +508,31 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
 
       {expanded && (
         <div className="border-t border-slate-100 px-4 py-3 space-y-3">
+          {/* Editable client name */}
+          <div className="flex items-center gap-2">
+            {editingName ? (
+              <>
+                <input
+                  autoFocus
+                  className="text-sm font-medium border border-teal-400 rounded-lg px-3 py-1.5 flex-1 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  value={clientName}
+                  onChange={e => setClientName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveClientName(); if (e.key === 'Escape') setEditingName(false) }}
+                />
+                <button onClick={saveClientName} className="text-xs bg-teal-600 text-white rounded-lg px-3 py-1.5 hover:bg-teal-700">Save</button>
+                <button onClick={() => setEditingName(false)} className="text-xs border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-50">Cancel</button>
+              </>
+            ) : (
+              <button
+                onClick={e => { e.stopPropagation(); setEditingName(true) }}
+                className="text-sm font-medium text-slate-800 hover:text-teal-600 flex items-center gap-1 group"
+              >
+                {clientName}
+                <span className="text-xs text-slate-400 group-hover:text-teal-500 opacity-0 group-hover:opacity-100 transition-opacity">(edit name)</span>
+              </button>
+            )}
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
             <Detail label="Room" value={`${room?.name} (${room?.meal_plan})`} />
             <Detail label="Rate/night" value={`${booking.currency} ${booking.rate_per_night?.toLocaleString()}`} />
@@ -559,13 +594,10 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
                 className="flex items-center gap-1 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5 hover:bg-teal-100">
                 <Mail size={13} /> Availability request
               </button>
-              {/* Reminder: shown when pending and we've already sent an email but have no received reply */}
-              {booking.status === 'Availability pending' &&
-                (emails ?? []).some(e => e.direction === 'sent') &&
-                !(emails ?? []).some(e => e.direction === 'received') && (
+              {booking.status === 'Availability pending' && (
                 <button onClick={() => onTemplate('reminder')}
                   className="flex items-center gap-1 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5 hover:bg-orange-100">
-                  <AlertTriangle size={13} /> Send reminder (no reply yet)
+                  <AlertTriangle size={13} /> Send reminder
                 </button>
               )}
               <button onClick={() => onTemplate('confirm')}
