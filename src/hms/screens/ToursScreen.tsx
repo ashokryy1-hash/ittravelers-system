@@ -13,6 +13,7 @@ interface ActivityItem {
   type?: 'stop' | 'transfer'
   from?: string
   to?: string
+  flight?: string
 }
 
 interface TourActivity {
@@ -58,19 +59,41 @@ interface Hotel {
 const TRANSFER_PREFIX = '__transfer__:'
 const TRANSFER_SEP = '|||'
 
-function encodeTransfer(from: string, to: string): string {
-  return `${TRANSFER_PREFIX}${from}${TRANSFER_SEP}${to}`
+function encodeTransfer(from: string, to: string, flight?: string): string {
+  const base = `${TRANSFER_PREFIX}${from}${TRANSFER_SEP}${to}`
+  return flight?.trim() ? `${base}${TRANSFER_SEP}flight:${flight.trim()}` : base
 }
 
-function parseTransfer(description: string): { isTransfer: boolean; from: string; to: string } {
+function parseTransfer(description: string): { isTransfer: boolean; from: string; to: string; flight: string } {
   if (description.startsWith(TRANSFER_PREFIX)) {
     const rest = description.slice(TRANSFER_PREFIX.length)
-    const idx = rest.indexOf(TRANSFER_SEP)
-    if (idx !== -1) {
-      return { isTransfer: true, from: rest.slice(0, idx), to: rest.slice(idx + TRANSFER_SEP.length) }
+    const parts = rest.split(TRANSFER_SEP)
+    if (parts.length >= 2) {
+      const from = parts[0]
+      const to = parts[1]
+      const flight = parts[2]?.startsWith('flight:') ? parts[2].slice(7) : ''
+      return { isTransfer: true, from, to, flight }
     }
   }
-  return { isTransfer: false, from: '', to: '' }
+  return { isTransfer: false, from: '', to: '', flight: '' }
+}
+
+// Contact encoding stored in tour notes
+const CONTACT_PREFIX = '__contact__:'
+function encodeContact(name: string, phone: string): string {
+  return `${CONTACT_PREFIX}${name.trim()}${TRANSFER_SEP}${phone.trim()}`
+}
+function parseContact(notes: string | null): { contactName: string; contactPhone: string; cleanNotes: string } {
+  if (!notes) return { contactName: '', contactPhone: '', cleanNotes: '' }
+  const lines = notes.split('\n')
+  const contactLine = lines.find(l => l.startsWith(CONTACT_PREFIX))
+  if (!contactLine) return { contactName: '', contactPhone: '', cleanNotes: notes }
+  const rest = contactLine.slice(CONTACT_PREFIX.length)
+  const idx = rest.indexOf(TRANSFER_SEP)
+  const contactName = idx !== -1 ? rest.slice(0, idx) : rest
+  const contactPhone = idx !== -1 ? rest.slice(idx + TRANSFER_SEP.length) : ''
+  const cleanNotes = lines.filter(l => !l.startsWith(CONTACT_PREFIX)).join('\n').trim()
+  return { contactName, contactPhone, cleanNotes }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -86,10 +109,12 @@ function formatDay(dateStr: string | null, dayNum: number) {
 
 function buildWhatsApp(tour: Tour): string {
   const days = [...(tour.hms_tour_days ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+  const { contactName, contactPhone, cleanNotes } = parseContact(tour.notes)
   const lines: string[] = []
   lines.push('🌼🌼')
   lines.push(tour.client_name)
   lines.push(`${tour.pax} pax`)
+  if (contactName) lines.push(`📞 ${contactName}${contactPhone ? ` — ${contactPhone}` : ''}`)
   for (const day of days) {
     lines.push('')
     lines.push('🌴')
@@ -98,16 +123,17 @@ function buildWhatsApp(tour: Tour): string {
     for (const act of acts) {
       const parsed = parseTransfer(act.description)
       if (parsed.isTransfer) {
-        lines.push(`${act.time} 🚗 Transfer: ${parsed.from} → ${parsed.to}`)
+        const flightNote = parsed.flight ? ` ✈️ ${parsed.flight}` : ''
+        lines.push(`${act.time} 🚗 Transfer: ${parsed.from} → ${parsed.to}${flightNote}`)
       } else {
         lines.push(`${act.time} ${act.description}`)
       }
     }
     lines.push('End of program')
   }
-  if (tour.notes) {
+  if (cleanNotes) {
     lines.push('')
-    lines.push(tour.notes)
+    lines.push(cleanNotes)
   }
   return lines.join('\n')
 }
@@ -332,6 +358,15 @@ function TourCard({ tour }: { tour: Tour }) {
 
       {expanded && (
         <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+          {/* Contact info */}
+          {(() => { const { contactName, contactPhone } = parseContact(tour.notes); return (contactName || contactPhone) ? (
+            <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
+              <span>📞</span>
+              <span className="font-medium">{contactName}</span>
+              {contactPhone && <span className="text-slate-400">— {contactPhone}</span>}
+            </div>
+          ) : null })()}
+
           {days.map((day, i) => {
             const acts = [...(day.hms_tour_activities ?? [])].sort((a, b) => a.sort_order - b.sort_order)
             return (
@@ -344,10 +379,11 @@ function TourCard({ tour }: { tour: Tour }) {
                     const parsed = parseTransfer(act.description)
                     if (parsed.isTransfer) {
                       return (
-                        <div key={act.id} className="text-sm text-slate-500 italic flex items-center gap-1.5">
-                          <span className="text-slate-400 font-mono not-italic">{act.time}</span>
-                          <Car size={13} className="text-slate-400 not-italic" />
-                          <span>{parsed.from} → {parsed.to}</span>
+                        <div key={act.id} className="text-sm text-slate-500 flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-400 font-mono">{act.time}</span>
+                          <Car size={13} className="text-slate-400" />
+                          <span className="italic">{parsed.from} → {parsed.to}</span>
+                          {parsed.flight && <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded px-1.5 py-0.5 not-italic">✈️ {parsed.flight}</span>}
                         </div>
                       )
                     }
@@ -363,11 +399,9 @@ function TourCard({ tour }: { tour: Tour }) {
               </div>
             )
           })}
-          {tour.notes && (
-            <div className="text-xs text-slate-500 border-t border-gray-100 pt-2 mt-2">
-              {tour.notes}
-            </div>
-          )}
+          {(() => { const { cleanNotes } = parseContact(tour.notes); return cleanNotes ? (
+            <div className="text-xs text-slate-500 border-t border-gray-100 pt-2 mt-2">{cleanNotes}</div>
+          ) : null })()}
           {/* WhatsApp preview */}
           <div className="mt-3 border-t border-gray-100 pt-3">
             <div className="text-xs font-medium text-slate-500 mb-2">WhatsApp preview</div>
@@ -505,6 +539,8 @@ interface DayDraft {
 function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; existingClients?: string[] }) {
   const qc = useQueryClient()
   const [clientName, setClientName] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
   const [pax, setPax] = useState(2)
   const [notes, setNotes] = useState('')
   const [days, setDays] = useState<DayDraft[]>([{ date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
@@ -529,6 +565,25 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
     },
   })
 
+  // Fetch this client's confirmed hotel names to prioritise in transfer dropdowns
+  const { data: clientBookings = [] } = useQuery({
+    queryKey: ['hms_bookings_client', clientName],
+    queryFn: async () => {
+      if (!clientName.trim()) return []
+      const { data } = await supabase
+        .from('hms_bookings')
+        .select('hms_hotels(name, city)')
+        .ilike('client_name', clientName.trim())
+        .in('status', ['Confirmed', 'Paid'])
+      return data ?? []
+    },
+    enabled: !!clientName.trim(),
+  })
+
+  const confirmedHotelNames: string[] = Array.from(new Set(
+    clientBookings.map((b: any) => b.hms_hotels?.name).filter(Boolean)
+  ))
+
   // Fetch existing tours for client autocomplete
   const { data: toursForClients = [] } = useQuery<Tour[]>({
     queryKey: ['hms_tours'],
@@ -546,7 +601,12 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
     new Map(toursForClients.map(t => [normalizeClientKey(t.client_name), t.client_name])).values()
   ).sort((a, b) => a.localeCompare(b))
 
-  const hotelOptions = hotels.map(h => h.city ? `${h.name}, ${h.city}` : h.name)
+  // Confirmed hotels first, then all hotels (deduped)
+  const allHotelNames = hotels.map(h => h.city ? `${h.name}, ${h.city}` : h.name)
+  const hotelOptions = [
+    ...confirmedHotelNames,
+    ...allHotelNames.filter(n => !confirmedHotelNames.some(c => n.startsWith(c))),
+  ]
 
   function addDay() {
     setDays(d => [...d, { date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
@@ -603,9 +663,13 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
     if (!clientName.trim()) return toast.error('Client name required')
     setSaving(true)
     try {
+      const contactLine = (contactName.trim() || contactPhone.trim())
+        ? encodeContact(contactName, contactPhone) + '\n'
+        : ''
+      const fullNotes = contactLine + (notes.trim() || '')
       const { data: tour, error: tErr } = await supabase
         .from('hms_tours')
-        .insert({ client_name: clientName.trim(), pax, notes: notes.trim() || null })
+        .insert({ client_name: clientName.trim(), pax, notes: fullNotes || null })
         .select()
         .single()
       if (tErr) throw tErr
@@ -631,7 +695,7 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
               day_id: dayRow.id,
               time: a.time,
               description: a.type === 'transfer'
-                ? encodeTransfer(a.from ?? '', a.to ?? '')
+                ? encodeTransfer(a.from ?? '', a.to ?? '', a.flight)
                 : a.description,
               sort_order: k,
             }))
@@ -673,10 +737,30 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
               <datalist id="client-names-list">
                 {clientNames.map(name => <option key={name} value={name} />)}
               </datalist>
+              {confirmedHotelNames.length > 0 && (
+                <div className="mt-1 flex items-center gap-1 flex-wrap">
+                  <span className="text-[10px] text-slate-400">Confirmed hotels:</span>
+                  {confirmedHotelNames.map(h => (
+                    <span key={h} className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 rounded px-1.5 py-0.5">{h}</span>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Pax</label>
               <input type="number" min={1} value={pax} onChange={e => setPax(Number(e.target.value))} className={inp} />
+            </div>
+          </div>
+
+          {/* Contact details */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Contact name</label>
+              <input value={contactName} onChange={e => setContactName(e.target.value)} className={inp} placeholder="e.g. Ahmed Mohamed" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Contact phone</label>
+              <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} className={inp} placeholder="+20 100 000 0000" />
             </div>
           </div>
 
@@ -753,9 +837,8 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
                     />
 
                     {act.type === 'transfer' ? (
-                      /* Transfer: From + To with datalists */
-                      <>
-                        <div className="flex-1 flex gap-2">
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex gap-2">
                           <div className="flex-1">
                             <input
                               value={act.from ?? ''}
@@ -782,7 +865,13 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
                             </datalist>
                           </div>
                         </div>
-                      </>
+                        <input
+                          value={act.flight ?? ''}
+                          onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                          className={inp}
+                          placeholder="✈️ Flight number (optional, e.g. MS985)"
+                        />
+                      </div>
                     ) : (
                       /* Stop: description field */
                       <input
