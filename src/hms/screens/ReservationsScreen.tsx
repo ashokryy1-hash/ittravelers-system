@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle, Users, List, ChevronRight } from 'lucide-react'
+import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle, Users, List, ChevronRight, Trash2 } from 'lucide-react'
 import type { HmsBooking, HmsBookingEmail, HmsHotel, HmsRoomType } from '../types'
 import EmailPreviewPanel from '../components/EmailPreviewPanel'
 import { Modal } from './RatesScreen'
@@ -268,6 +268,13 @@ Agency signature: ${settings.agency_signature}`
     return acc
   }, {})
 
+  async function deleteBooking(id: string) {
+    await supabase.from('hms_booking_emails').delete().eq('booking_id', id)
+    await supabase.from('hms_bookings').delete().eq('id', id)
+    qc.invalidateQueries({ queryKey: ['hms_bookings'] })
+    toast.success('Booking deleted')
+  }
+
   const renderBookingCard = (booking: HmsBooking) => (
     <BookingCard
       key={booking.id}
@@ -276,6 +283,7 @@ Agency signature: ${settings.agency_signature}`
       onToggle={() => setOpenBooking(openBooking === booking.id ? null : booking.id)}
       onDraftEmail={() => draftAvailabilityEmail(booking)}
       onTemplate={(type) => useTemplate(type, booking)}
+      onDelete={() => deleteBooking(booking.id)}
     />
   )
 
@@ -419,12 +427,13 @@ Agency signature: ${settings.agency_signature}`
   )
 }
 
-function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: {
+function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, onDelete }: {
   booking: HmsBooking
   expanded: boolean
   onToggle: () => void
   onDraftEmail: () => void
   onTemplate: (type: 'availability' | 'confirm' | 'payment' | 'cancel' | 'reminder') => void
+  onDelete: () => void
 }) {
   const qc = useQueryClient()
   const hotel = (booking as any).hms_hotels
@@ -435,6 +444,7 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
   const [cutoffDate, setCutoffDate] = useState(booking.cutoff_date ?? '')
   const [editingName, setEditingName] = useState(false)
   const [clientName, setClientName] = useState(booking.client_name ?? '')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const cutoffDays = daysUntil(booking.cutoff_date)
   const showCutoffWarning = cutoffDays !== null && cutoffDays <= 14 && booking.status !== 'Paid' && booking.status !== 'Cancelled'
@@ -545,7 +555,7 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
           </div>
 
           {/* Status update */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             {['Availability pending', 'Confirmed', 'Paid', 'Cancelled'].map(s => (
               <button
                 key={s}
@@ -557,6 +567,30 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
                 {s}
               </button>
             ))}
+            {booking.status === 'Cancelled' && (
+              <div className="ml-auto flex items-center gap-1">
+                {confirmDelete ? (
+                  <>
+                    <span className="text-xs text-red-600">Delete permanently?</span>
+                    <button
+                      onClick={onDelete}
+                      className="text-xs bg-red-600 text-white rounded-lg px-3 py-1 hover:bg-red-700"
+                    >Yes, delete</button>
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      className="text-xs border border-slate-300 rounded-lg px-3 py-1 hover:bg-slate-50"
+                    >Cancel</button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-1 text-xs text-red-600 border border-red-200 bg-red-50 rounded-lg px-3 py-1 hover:bg-red-100"
+                  >
+                    <Trash2 size={12} /> Delete booking
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Confirm number + cutoff date */}
