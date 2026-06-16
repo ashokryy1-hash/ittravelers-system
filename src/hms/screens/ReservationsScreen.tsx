@@ -6,7 +6,8 @@ import type { HmsBooking, HmsBookingEmail, HmsHotel, HmsRoomType } from '../type
 import EmailPreviewPanel from '../components/EmailPreviewPanel'
 import { Modal } from './RatesScreen'
 import { getSettings } from '../lib/settings'
-import { nightsBetween } from '../lib/season'
+import { getSeasonForStay, seasonLabel, nightsBetween } from '../lib/season'
+import type { HmsSurchargeRule } from '../types'
 import toast from 'react-hot-toast'
 
 function daysUntil(dateStr: string | null | undefined): number | null {
@@ -22,7 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
   'Cancelled': 'bg-red-100 text-red-700',
 }
 
-function buildEmailTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel' | 'reminder', booking: HmsBooking, settings: Record<string, string>) {
+function buildEmailTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel' | 'reminder', booking: HmsBooking, settings: Record<string, string>, season: string = 'Low') {
   const hotel = (booking as any).hms_hotels
   const room = (booking as any).hms_room_types
   const hotelName = hotel?.name ?? 'your hotel'
@@ -35,6 +36,7 @@ function buildEmailTemplate(type: 'availability' | 'confirm' | 'payment' | 'canc
   const nights = booking.nights
   const sig = settings.agency_signature ?? 'ITTravelers\nAhmed Shokry – Operations Manager'
   const toEmail = hotel?.reservation_email || hotel?.contact_email || ''
+  const seasonNote = season !== 'Low' ? ` (${season} Season)` : ''
 
   if (type === 'availability') {
     return {
@@ -51,7 +53,7 @@ I am writing on behalf of ITTravelers to kindly request availability for the fol
 • Check-in: ${checkin}
 • Check-out: ${checkout}
 • Duration: ${nights} night${nights !== 1 ? 's' : ''}
-• Rate: ${currency} ${rate}/night (as per our corporate contract)
+• Rate: ${currency} ${rate}/night${seasonNote} (as per our corporate contract)
 • Guests: Honeymoon couple
 
 Could you please confirm availability and kindly hold the room pending our voucher?
@@ -76,7 +78,7 @@ Thank you for confirming availability. We are pleased to proceed with the follow
 • Check-in: ${checkin} at 2:00 PM
 • Check-out: ${checkout} at 12:00 PM
 • Duration: ${nights} night${nights !== 1 ? 's' : ''}
-• Rate: ${currency} ${rate}/night (as per our corporate contract)
+• Rate: ${currency} ${rate}/night${seasonNote} (as per our corporate contract)
 • Total: ${currency} ${booking.total_price_idr?.toLocaleString()}
 
 Please send us the official hotel voucher and payment details at your earliest convenience.
@@ -122,7 +124,7 @@ I am following up on my previous availability request for the below reservation,
 • Check-in: ${checkin}
 • Check-out: ${checkout}
 • Duration: ${nights} night${nights !== 1 ? 's' : ''}
-• Rate: ${currency} ${rate}/night (as per our corporate contract)
+• Rate: ${currency} ${rate}/night${seasonNote} (as per our corporate contract)
 • Guests: Honeymoon couple
 
 Could you please kindly confirm availability at your earliest convenience? We would like to proceed with the booking as soon as possible.
@@ -177,7 +179,20 @@ export default function ReservationsScreen() {
 
   async function useTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel' | 'reminder', booking: HmsBooking) {
     const settings = await getSettings()
-    const draft = buildEmailTemplate(type, booking, settings)
+    // Fetch surcharge rules for the hotel's destination to determine season
+    const hotel = (booking as any).hms_hotels
+    let season = 'Low'
+    if (hotel?.destination_id && booking.checkin_date && booking.checkout_date) {
+      const { data: rules } = await supabase
+        .from('hms_surcharge_rules')
+        .select('*')
+        .eq('destination_id', hotel.destination_id)
+      if (rules && rules.length > 0) {
+        const { season: s } = getSeasonForStay(booking.checkin_date, booking.checkout_date, rules as HmsSurchargeRule[])
+        season = seasonLabel(s)
+      }
+    }
+    const draft = buildEmailTemplate(type, booking, settings, season)
     setEmailDraft({ ...draft, bookingId: booking.id })
   }
 
