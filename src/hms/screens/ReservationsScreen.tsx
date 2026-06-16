@@ -171,7 +171,7 @@ export default function ReservationsScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('hms_bookings')
-        .select('*, cutoff_date, hms_hotels(name, contact_email, reservation_email, city, surcharge_waiver), hms_room_types(name, room_category, meal_plan, currency, low_season_rate, high_season_rate, peak_season_rate)')
+        .select('*, cutoff_date, hms_hotels(name, contact_email, reservation_email, city, surcharge_waiver, destination_id), hms_room_types(name, room_category, meal_plan, currency, low_season_rate, high_season_rate, peak_season_rate)')
         .order('checkin_date')
       return data ?? []
     },
