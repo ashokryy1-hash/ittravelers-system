@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Trash2, Copy, ChevronDown, ChevronUp, BookOpen, X, Check } from 'lucide-react'
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, BookOpen, X, Check, Users, List, ChevronRight, Car, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
 
@@ -10,6 +10,9 @@ import { format, parseISO } from 'date-fns'
 interface ActivityItem {
   time: string
   description: string
+  type?: 'stop' | 'transfer'
+  from?: string
+  to?: string
 }
 
 interface TourActivity {
@@ -44,6 +47,32 @@ interface ActivityTemplate {
   activities: ActivityItem[]
 }
 
+interface Hotel {
+  id: string
+  name: string
+  city?: string
+}
+
+// ─── Transfer encoding helpers ────────────────────────────────────────────────
+
+const TRANSFER_PREFIX = '__transfer__:'
+const TRANSFER_SEP = '|||'
+
+function encodeTransfer(from: string, to: string): string {
+  return `${TRANSFER_PREFIX}${from}${TRANSFER_SEP}${to}`
+}
+
+function parseTransfer(description: string): { isTransfer: boolean; from: string; to: string } {
+  if (description.startsWith(TRANSFER_PREFIX)) {
+    const rest = description.slice(TRANSFER_PREFIX.length)
+    const idx = rest.indexOf(TRANSFER_SEP)
+    if (idx !== -1) {
+      return { isTransfer: true, from: rest.slice(0, idx), to: rest.slice(idx + TRANSFER_SEP.length) }
+    }
+  }
+  return { isTransfer: false, from: '', to: '' }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDay(dateStr: string | null, dayNum: number) {
@@ -67,7 +96,12 @@ function buildWhatsApp(tour: Tour): string {
     lines.push(formatDay(day.date, day.sort_order + 1))
     const acts = [...(day.hms_tour_activities ?? [])].sort((a, b) => a.sort_order - b.sort_order)
     for (const act of acts) {
-      lines.push(`${act.time} ${act.description}`)
+      const parsed = parseTransfer(act.description)
+      if (parsed.isTransfer) {
+        lines.push(`${act.time} 🚗 Transfer: ${parsed.from} → ${parsed.to}`)
+      } else {
+        lines.push(`${act.time} ${act.description}`)
+      }
     }
     lines.push('End of program')
   }
@@ -76,6 +110,10 @@ function buildWhatsApp(tour: Tour): string {
     lines.push(tour.notes)
   }
   return lines.join('\n')
+}
+
+function normalizeClientKey(name: string): string {
+  return name.trim().toLowerCase()
 }
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
@@ -115,7 +153,7 @@ export default function ToursScreen() {
         ))}
       </div>
 
-      {tab === 'tours' && <ToursTab />}
+      {tab === 'tours' && <ToursTab onNew={() => setShowNew(true)} />}
       {tab === 'library' && <LibraryTab />}
 
       {showNew && <NewTourModal onClose={() => setShowNew(false)} />}
@@ -125,7 +163,9 @@ export default function ToursScreen() {
 
 // ─── Tours Tab ────────────────────────────────────────────────────────────────
 
-function ToursTab() {
+function ToursTab({ onNew }: { onNew: () => void }) {
+  const [view, setView] = useState<'list' | 'clients'>('list')
+
   const { data: tours = [], isLoading } = useQuery<Tour[]>({
     queryKey: ['hms_tours'],
     queryFn: async () => {
@@ -138,20 +178,112 @@ function ToursTab() {
     },
   })
 
+  // Compute existing client names for autocomplete
+  const existingClients = Array.from(
+    new Map(tours.map(t => [normalizeClientKey(t.client_name), t.client_name])).values()
+  ).sort((a, b) => a.localeCompare(b))
+
   if (isLoading) return <div className="text-slate-400 text-sm">Loading…</div>
-  if (!tours.length) return (
-    <div className="text-center py-20 text-slate-400">
-      <p className="text-lg mb-2">No tours yet</p>
-      <p className="text-sm">Click "New Tour" to create your first itinerary</p>
-    </div>
-  )
 
   return (
-    <div className="space-y-4">
-      {tours.map(tour => <TourCard key={tour.id} tour={tour} />)}
+    <div>
+      {/* View toggle */}
+      <div className="flex justify-end mb-4">
+        <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs">
+          <button
+            onClick={() => setView('list')}
+            className={`flex items-center gap-1 px-3 py-1.5 transition-colors ${view === 'list' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            <List size={13} /> All
+          </button>
+          <button
+            onClick={() => setView('clients')}
+            className={`flex items-center gap-1 px-3 py-1.5 transition-colors ${view === 'clients' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            <Users size={13} /> Clients
+          </button>
+        </div>
+      </div>
+
+      {!tours.length && (
+        <div className="text-center py-20 text-slate-400">
+          <p className="text-lg mb-2">No tours yet</p>
+          <p className="text-sm">Click "New Tour" to create your first itinerary</p>
+        </div>
+      )}
+
+      {view === 'list' && tours.length > 0 && (
+        <div className="space-y-4">
+          {tours.map(tour => <TourCard key={tour.id} tour={tour} />)}
+        </div>
+      )}
+
+      {view === 'clients' && tours.length > 0 && (
+        <ClientsView tours={tours} />
+      )}
     </div>
   )
 }
+
+// ─── Clients View ─────────────────────────────────────────────────────────────
+
+function ClientsView({ tours }: { tours: Tour[] }) {
+  const [openClients, setOpenClients] = useState<Set<string>>(new Set())
+
+  // Group by normalized client key
+  const grouped = new Map<string, { displayName: string; tours: Tour[] }>()
+  for (const tour of tours) {
+    const key = normalizeClientKey(tour.client_name)
+    if (!grouped.has(key)) {
+      grouped.set(key, { displayName: tour.client_name, tours: [] })
+    }
+    grouped.get(key)!.tours.push(tour)
+  }
+
+  const entries = Array.from(grouped.entries()).sort((a, b) => a[1].displayName.localeCompare(b[1].displayName))
+
+  function toggleClient(key: string) {
+    setOpenClients(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.map(([key, { displayName, tours: clientTours }]) => {
+        const isOpen = openClients.has(key)
+        const initial = displayName.trim()[0]?.toUpperCase() ?? '?'
+        return (
+          <div key={key} className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+            <button
+              onClick={() => toggleClient(key)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+            >
+              <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {initial}
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-slate-800">{displayName}</div>
+                <div className="text-xs text-slate-500">{clientTours.length} tour{clientTours.length !== 1 ? 's' : ''}</div>
+              </div>
+              {isOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+            </button>
+            {isOpen && (
+              <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+                {clientTours.map(tour => <TourCard key={tour.id} tour={tour} />)}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Tour Card ────────────────────────────────────────────────────────────────
 
 function TourCard({ tour }: { tour: Tour }) {
   const qc = useQueryClient()
@@ -208,12 +340,24 @@ function TourCard({ tour }: { tour: Tour }) {
                   🌴 {formatDay(day.date, i + 1)}
                 </div>
                 <div className="space-y-0.5 pl-2">
-                  {acts.map(act => (
-                    <div key={act.id} className="text-sm text-slate-700">
-                      <span className="text-slate-400 font-mono mr-2">{act.time}</span>
-                      {act.description}
-                    </div>
-                  ))}
+                  {acts.map(act => {
+                    const parsed = parseTransfer(act.description)
+                    if (parsed.isTransfer) {
+                      return (
+                        <div key={act.id} className="text-sm text-slate-500 italic flex items-center gap-1.5">
+                          <span className="text-slate-400 font-mono not-italic">{act.time}</span>
+                          <Car size={13} className="text-slate-400 not-italic" />
+                          <span>{parsed.from} → {parsed.to}</span>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div key={act.id} className="text-sm text-slate-700">
+                        <span className="text-slate-400 font-mono mr-2">{act.time}</span>
+                        {act.description}
+                      </div>
+                    )
+                  })}
                   {!acts.length && <div className="text-xs text-slate-400">No activities</div>}
                 </div>
               </div>
@@ -358,12 +502,12 @@ interface DayDraft {
   activities: ActivityItem[]
 }
 
-function NewTourModal({ onClose }: { onClose: () => void }) {
+function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; existingClients?: string[] }) {
   const qc = useQueryClient()
   const [clientName, setClientName] = useState('')
   const [pax, setPax] = useState(2)
   const [notes, setNotes] = useState('')
-  const [days, setDays] = useState<DayDraft[]>([{ date: '', activities: [{ time: '', description: '' }] }])
+  const [days, setDays] = useState<DayDraft[]>([{ date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
   const [saving, setSaving] = useState(false)
   const [showLibrary, setShowLibrary] = useState<number | null>(null)
 
@@ -376,8 +520,36 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
     },
   })
 
+  const { data: hotels = [] } = useQuery<Hotel[]>({
+    queryKey: ['hms_hotels_names'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('hms_hotels').select('id, name, city').order('name')
+      if (error) throw error
+      return data ?? []
+    },
+  })
+
+  // Fetch existing tours for client autocomplete
+  const { data: toursForClients = [] } = useQuery<Tour[]>({
+    queryKey: ['hms_tours'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('hms_tours')
+        .select('id, client_name, pax, notes, created_at, hms_tour_days(id, tour_id, date, sort_order, hms_tour_activities(id, day_id, time, description, sort_order))')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data ?? []
+    },
+  })
+
+  const clientNames = Array.from(
+    new Map(toursForClients.map(t => [normalizeClientKey(t.client_name), t.client_name])).values()
+  ).sort((a, b) => a.localeCompare(b))
+
+  const hotelOptions = hotels.map(h => h.city ? `${h.name}, ${h.city}` : h.name)
+
   function addDay() {
-    setDays(d => [...d, { date: '', activities: [{ time: '', description: '' }] }])
+    setDays(d => [...d, { date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
   }
 
   function removeDay(i: number) {
@@ -395,9 +567,22 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
     }))
   }
 
+  function toggleActivityType(dayIdx: number, actIdx: number) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day,
+      activities: day.activities.map((a, k) => k !== actIdx ? a : {
+        ...a,
+        type: a.type === 'transfer' ? 'stop' : 'transfer',
+        description: '',
+        from: '',
+        to: '',
+      }),
+    }))
+  }
+
   function addActivity(dayIdx: number) {
     setDays(d => d.map((day, j) => j !== dayIdx ? day : {
-      ...day, activities: [...day.activities, { time: '', description: '' }],
+      ...day, activities: [...day.activities, { time: '', description: '', type: 'stop' as const }],
     }))
   }
 
@@ -409,7 +594,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
 
   function applyTemplate(dayIdx: number, template: ActivityTemplate) {
     setDays(d => d.map((day, j) => j !== dayIdx ? day : {
-      ...day, activities: template.activities.map(a => ({ ...a })),
+      ...day, activities: template.activities.map(a => ({ ...a, type: 'stop' as const })),
     }))
     setShowLibrary(null)
   }
@@ -434,10 +619,22 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
           .single()
         if (dErr) throw dErr
 
-        const acts = day.activities.filter(a => a.description.trim())
+        // Convert UI state to DB description strings
+        const acts = day.activities.filter(a => {
+          if (a.type === 'transfer') return (a.from || '').trim() || (a.to || '').trim()
+          return a.description.trim()
+        })
+
         if (acts.length) {
           const { error: aErr } = await supabase.from('hms_tour_activities').insert(
-            acts.map((a, k) => ({ day_id: dayRow.id, time: a.time, description: a.description, sort_order: k }))
+            acts.map((a, k) => ({
+              day_id: dayRow.id,
+              time: a.time,
+              description: a.type === 'transfer'
+                ? encodeTransfer(a.from ?? '', a.to ?? '')
+                : a.description,
+              sort_order: k,
+            }))
           )
           if (aErr) throw aErr
         }
@@ -466,7 +663,16 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
               <label className="block text-xs font-medium text-slate-600 mb-1">Client Name</label>
-              <input value={clientName} onChange={e => setClientName(e.target.value)} className={inp} placeholder="e.g. Ahmed & Sara" />
+              <input
+                value={clientName}
+                onChange={e => setClientName(e.target.value)}
+                className={inp}
+                placeholder="e.g. Ahmed & Sara"
+                list="client-names-list"
+              />
+              <datalist id="client-names-list">
+                {clientNames.map(name => <option key={name} value={name} />)}
+              </datalist>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Pax</label>
@@ -523,20 +729,71 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
               {/* Activities */}
               <div className="space-y-2">
                 {day.activities.map((act, actIdx) => (
-                  <div key={actIdx} className="flex gap-2">
+                  <div key={actIdx} className="flex gap-2 items-start">
+                    {/* Type toggle */}
+                    <button
+                      type="button"
+                      onClick={() => toggleActivityType(dayIdx, actIdx)}
+                      title={act.type === 'transfer' ? 'Switch to stop' : 'Switch to transfer'}
+                      className={`flex-shrink-0 mt-0.5 flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ${
+                        act.type === 'transfer'
+                          ? 'bg-slate-100 border-slate-300 text-slate-700'
+                          : 'bg-teal-50 border-teal-200 text-teal-700'
+                      }`}
+                    >
+                      {act.type === 'transfer' ? <><Car size={11} /> Transfer</> : <>🏖 Stop</>}
+                    </button>
+
+                    {/* Time field (always) */}
                     <input
                       value={act.time}
                       onChange={e => setActivity(dayIdx, actIdx, 'time', e.target.value)}
-                      className={`${inp} w-24`}
+                      className={`${inp} w-24 flex-shrink-0`}
                       placeholder="09:00"
                     />
-                    <input
-                      value={act.description}
-                      onChange={e => setActivity(dayIdx, actIdx, 'description', e.target.value)}
-                      className={inp}
-                      placeholder="Activity / transfer / hotel check-in…"
-                    />
-                    <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400">
+
+                    {act.type === 'transfer' ? (
+                      /* Transfer: From + To with datalists */
+                      <>
+                        <div className="flex-1 flex gap-2">
+                          <div className="flex-1">
+                            <input
+                              value={act.from ?? ''}
+                              onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                              className={inp}
+                              placeholder="From"
+                              list={`hotels-from-${dayIdx}-${actIdx}`}
+                            />
+                            <datalist id={`hotels-from-${dayIdx}-${actIdx}`}>
+                              {hotelOptions.map(h => <option key={h} value={h} />)}
+                            </datalist>
+                          </div>
+                          <div className="flex items-center text-slate-400 flex-shrink-0 mt-2">→</div>
+                          <div className="flex-1">
+                            <input
+                              value={act.to ?? ''}
+                              onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                              className={inp}
+                              placeholder="To"
+                              list={`hotels-to-${dayIdx}-${actIdx}`}
+                            />
+                            <datalist id={`hotels-to-${dayIdx}-${actIdx}`}>
+                              {hotelOptions.map(h => <option key={h} value={h} />)}
+                            </datalist>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      /* Stop: description field */
+                      <input
+                        value={act.description}
+                        onChange={e => setActivity(dayIdx, actIdx, 'description', e.target.value)}
+                        className={inp}
+                        placeholder="Activity / hotel check-in…"
+                      />
+                    )}
+
+                    <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0 mt-1.5">
                       <X size={14} />
                     </button>
                   </div>
