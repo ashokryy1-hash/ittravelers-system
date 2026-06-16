@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Trash2, Copy, ChevronDown, ChevronUp, BookOpen, X, Check, Users, List, ChevronRight, Car, Plane, PlaneLanding, PlaneTakeoff, Search } from 'lucide-react'
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, BookOpen, X, Check, Users, List, ChevronRight, Car, PlaneLanding, PlaneTakeoff, Search, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
 
@@ -312,6 +312,7 @@ function TourCard({ tour }: { tour: Tour }) {
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   const days = [...(tour.hms_tour_days ?? [])].sort((a, b) => a.sort_order - b.sort_order)
 
@@ -330,6 +331,8 @@ function TourCard({ tour }: { tour: Tour }) {
   }
 
   return (
+    <>
+    {editing && <EditTourModal tour={tour} onClose={() => setEditing(false)} />}
     <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3">
         <button onClick={() => setExpanded(e => !e)} className="flex-1 text-left flex items-center gap-3">
@@ -347,6 +350,9 @@ function TourCard({ tour }: { tour: Tour }) {
         >
           {copied ? <Check size={13} /> : <Copy size={13} />}
           {copied ? 'Copied!' : 'WhatsApp'}
+        </button>
+        <button onClick={() => setEditing(true)} className="text-slate-400 hover:text-teal-600 transition-colors p-1" title="Edit tour">
+          <Pencil size={15} />
         </button>
         <button onClick={deleteTour} className="text-slate-400 hover:text-red-500 transition-colors p-1">
           <Trash2 size={15} />
@@ -423,6 +429,7 @@ function TourCard({ tour }: { tour: Tour }) {
         </div>
       )}
     </div>
+    </>
   )
 }
 
@@ -535,6 +542,392 @@ function LibraryTab() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Edit Tour Modal ──────────────────────────────────────────────────────────
+
+function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
+  const qc = useQueryClient()
+
+  const { contactName: initCN, contactPhone: initCP, cleanNotes: initNotes } = parseContact(tour.notes)
+
+  const sortedDays = [...(tour.hms_tour_days ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+
+  const [clientName, setClientName] = useState(tour.client_name)
+  const [pax, setPax] = useState(tour.pax)
+  const [contactName, setContactName] = useState(initCN)
+  const [contactPhone, setContactPhone] = useState(initCP)
+  const [notes, setNotes] = useState(initNotes)
+  const [days, setDays] = useState<DayDraft[]>(() =>
+    sortedDays.map(day => ({
+      date: day.date ?? '',
+      activities: [...(day.hms_tour_activities ?? [])]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(act => {
+          const p = parseActivity(act.description)
+          return { time: act.time, description: p.text, type: p.type, from: p.from, to: p.to, flight: p.flight }
+        }),
+    }))
+  )
+  const [saving, setSaving] = useState(false)
+  const [showLibrary, setShowLibrary] = useState<number | null>(null)
+
+  const { data: templates = [] } = useQuery<ActivityTemplate[]>({
+    queryKey: ['hms_activity_templates'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('hms_activity_templates').select('*').order('created_at')
+      if (error) throw error
+      return (data ?? []).map(t => ({ ...t, activities: typeof t.activities === 'string' ? JSON.parse(t.activities) : t.activities }))
+    },
+  })
+
+  const { data: hotels = [] } = useQuery<Hotel[]>({
+    queryKey: ['hms_hotels_names'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('hms_hotels').select('id, name, city').order('name')
+      if (error) throw error
+      return data ?? []
+    },
+  })
+
+  const { data: clientBookings = [] } = useQuery({
+    queryKey: ['hms_bookings_client_edit', clientName],
+    queryFn: async () => {
+      if (!clientName.trim()) return []
+      const { data } = await supabase
+        .from('hms_bookings')
+        .select('hms_hotels(name)')
+        .ilike('client_name', clientName.trim())
+        .in('status', ['Confirmed', 'Paid'])
+      return data ?? []
+    },
+    enabled: !!clientName.trim(),
+  })
+
+  const confirmedHotels: string[] = Array.from(new Set(
+    clientBookings.map((b: any) => b.hms_hotels?.name).filter(Boolean)
+  ))
+  const allHotelNames = hotels.map(h => h.city ? `${h.name}, ${h.city}` : h.name)
+  const hotelOptions = [...confirmedHotels, ...allHotelNames.filter(n => !confirmedHotels.some(c => n.startsWith(c)))]
+
+  function setActivity(dayIdx: number, actIdx: number, field: keyof ActivityItem, value: string) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: day.activities.map((a, k) => k !== actIdx ? a : { ...a, [field]: value }),
+    }))
+  }
+
+  function cycleActivityType(dayIdx: number, actIdx: number) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: day.activities.map((a, k) => k !== actIdx ? a : {
+        ...a,
+        type: ACTIVITY_TYPES[(ACTIVITY_TYPES.indexOf(a.type) + 1) % ACTIVITY_TYPES.length],
+        description: '', from: '', to: '', flight: '',
+      }),
+    }))
+  }
+
+  function addActivity(dayIdx: number) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: [...day.activities, { time: '', description: '', type: 'stop' as const }],
+    }))
+  }
+
+  function removeActivity(dayIdx: number, actIdx: number) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: day.activities.filter((_, k) => k !== actIdx),
+    }))
+  }
+
+  function addDay() {
+    setDays(d => [...d, { date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
+  }
+
+  function removeDay(i: number) {
+    setDays(d => d.filter((_, j) => j !== i))
+  }
+
+  function setDayDate(i: number, date: string) {
+    setDays(d => d.map((x, j) => j === i ? { ...x, date } : x))
+  }
+
+  function applyTemplate(dayIdx: number, template: ActivityTemplate) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: template.activities.map(a => ({ ...a, type: 'stop' as const })),
+    }))
+    setShowLibrary(null)
+  }
+
+  async function save() {
+    if (!clientName.trim()) return toast.error('Client name required')
+    setSaving(true)
+    try {
+      const contactLine = (contactName.trim() || contactPhone.trim())
+        ? encodeContact(contactName, contactPhone) + '\n' : ''
+      const fullNotes = contactLine + (notes.trim() || '')
+
+      const { error: tErr } = await supabase
+        .from('hms_tours')
+        .update({ client_name: clientName.trim(), pax, notes: fullNotes || null })
+        .eq('id', tour.id)
+      if (tErr) throw tErr
+
+      // Delete existing days (cascade deletes activities)
+      await supabase.from('hms_tour_days').delete().eq('tour_id', tour.id)
+
+      for (let i = 0; i < days.length; i++) {
+        const day = days[i]
+        const { data: dayRow, error: dErr } = await supabase
+          .from('hms_tour_days')
+          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i })
+          .select().single()
+        if (dErr) throw dErr
+
+        const acts = day.activities.filter(a => {
+          if (a.type === 'transfer') return (a.from || '').trim() || (a.to || '').trim()
+          if (a.type === 'airport-pickup') return (a.to || '').trim()
+          if (a.type === 'airport-dropoff') return (a.from || '').trim()
+          return a.description.trim()
+        })
+
+        if (acts.length) {
+          const { error: aErr } = await supabase.from('hms_tour_activities').insert(
+            acts.map((a, k) => {
+              let description = a.description
+              if (a.type === 'transfer') description = encode('transfer', { from: a.from ?? '', to: a.to ?? '', flight: a.flight ?? '' })
+              else if (a.type === 'airport-pickup') description = encode('airport-pickup', { to: a.to ?? '', flight: a.flight ?? '' })
+              else if (a.type === 'airport-dropoff') description = encode('airport-dropoff', { from: a.from ?? '', flight: a.flight ?? '' })
+              return { day_id: dayRow.id, time: a.time, description, sort_order: k }
+            })
+          )
+          if (aErr) throw aErr
+        }
+      }
+
+      qc.invalidateQueries({ queryKey: ['hms_tours'] })
+      toast.success('Tour updated')
+      onClose()
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8 px-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-bold text-slate-800">Edit Tour — {tour.client_name}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Client + Pax */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Client Name</label>
+              <input value={clientName} onChange={e => setClientName(e.target.value)} className={inp} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Pax</label>
+              <input type="number" min={1} value={pax} onChange={e => setPax(Number(e.target.value))} className={inp} />
+            </div>
+          </div>
+
+          {/* Contact */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Contact name</label>
+              <input value={contactName} onChange={e => setContactName(e.target.value)} className={inp} placeholder="Ahmed Mohamed" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Contact phone</label>
+              <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} className={inp} placeholder="+20 100…" />
+            </div>
+          </div>
+
+          {/* Confirmed hotel chips */}
+          {confirmedHotels.length > 0 && (
+            <div className="flex flex-wrap gap-1 items-center">
+              <span className="text-[10px] text-slate-400">Confirmed hotels:</span>
+              {confirmedHotels.map(h => (
+                <span key={h} className="text-[10px] bg-teal-100 text-teal-700 border border-teal-200 rounded px-1.5 py-0.5 font-medium">{h}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Days */}
+          {days.map((day, dayIdx) => (
+            <div key={dayIdx} className="border border-gray-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-teal-700">🌴 Day {dayIdx + 1}</span>
+                  <input
+                    type="date"
+                    value={day.date}
+                    onChange={e => setDayDate(dayIdx, e.target.value)}
+                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowLibrary(showLibrary === dayIdx ? null : dayIdx)}
+                    className="flex items-center gap-1 text-xs border border-gray-300 rounded-lg px-2 py-1 text-slate-600 hover:bg-gray-50"
+                  >
+                    <BookOpen size={12} /> Template
+                  </button>
+                  {days.length > 1 && (
+                    <button onClick={() => removeDay(dayIdx)} className="text-slate-400 hover:text-red-500">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {showLibrary === dayIdx && (
+                <div className="bg-gray-50 rounded-lg p-2 space-y-1 border border-gray-200">
+                  <div className="text-xs text-slate-500 px-1 mb-1">Pick a template</div>
+                  {templates.map(t => (
+                    <button key={t.id} onClick={() => applyTemplate(dayIdx, t)}
+                      className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-700">
+                      {t.icon} {t.name} <span className="text-xs text-slate-400 ml-2">({t.activities.length} stops)</span>
+                    </button>
+                  ))}
+                  {!templates.length && <div className="text-xs text-slate-400 px-2">No templates yet</div>}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {day.activities.map((act, actIdx) => {
+                  const cfg = TYPE_CONFIG[act.type]
+                  return (
+                    <div key={actIdx} className="space-y-1.5">
+                      <div className="flex gap-2 items-center">
+                        <button type="button" onClick={() => cycleActivityType(dayIdx, actIdx)}
+                          className={`flex-shrink-0 flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ${cfg.bg}`}>
+                          {cfg.label}
+                        </button>
+                        <input value={act.time} onChange={e => setActivity(dayIdx, actIdx, 'time', e.target.value)}
+                          className={`${inp} w-24 flex-shrink-0`} placeholder="09:00" />
+                        <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0 ml-auto">
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      {act.type === 'stop' && (
+                        <input value={act.description} onChange={e => setActivity(dayIdx, actIdx, 'description', e.target.value)}
+                          className={inp} placeholder="Activity / hotel check-in…" />
+                      )}
+
+                      {act.type === 'transfer' && (
+                        <div className="space-y-1.5 pl-1">
+                          <div className="flex gap-2 items-center">
+                            <div className="flex-1">
+                              <input value={act.from ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                                className={inp} placeholder="From" list={`e-from-${dayIdx}-${actIdx}`} />
+                              <datalist id={`e-from-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                            </div>
+                            <span className="text-slate-400 text-xs flex-shrink-0">→</span>
+                            <div className="flex-1">
+                              <input value={act.to ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                                className={inp} placeholder="To" list={`e-to-${dayIdx}-${actIdx}`} />
+                              <datalist id={`e-to-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                            </div>
+                          </div>
+                          {confirmedHotels.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {confirmedHotels.map(h => (
+                                <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
+                                  className="text-[10px] bg-slate-100 hover:bg-teal-100 text-slate-600 hover:text-teal-800 border border-slate-200 rounded px-1.5 py-0.5">→ {h}</button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {act.type === 'airport-pickup' && (
+                        <div className="space-y-1.5 pl-1">
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">✈️ Arrival Flight</label>
+                              <input value={act.flight ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                                className={inp} placeholder="e.g. MS985" />
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">Drop to hotel</label>
+                              <input value={act.to ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                                className={inp} placeholder="Hotel / destination" list={`e-pickup-to-${dayIdx}-${actIdx}`} />
+                              <datalist id={`e-pickup-to-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                            </div>
+                          </div>
+                          {confirmedHotels.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
+                              {confirmedHotels.map(h => (
+                                <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
+                                  className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5">{h}</button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {act.type === 'airport-dropoff' && (
+                        <div className="space-y-1.5 pl-1">
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">Pick up from hotel</label>
+                              <input value={act.from ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                                className={inp} placeholder="Hotel / pickup location" list={`e-dropoff-from-${dayIdx}-${actIdx}`} />
+                              <datalist id={`e-dropoff-from-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">🛫 Departure Flight</label>
+                              <input value={act.flight ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                                className={inp} placeholder="e.g. MS986" />
+                            </div>
+                          </div>
+                          {confirmedHotels.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
+                              {confirmedHotels.map(h => (
+                                <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'from', h)}
+                                  className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5">{h}</button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                <button onClick={() => addActivity(dayIdx)} className="text-xs text-teal-600 hover:underline">+ Add activity</button>
+              </div>
+            </div>
+          ))}
+
+          <button onClick={addDay}
+            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-slate-500 hover:border-teal-400 hover:text-teal-600 transition-colors">
+            + Add Day
+          </button>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Notes (optional)</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              className={`${inp} resize-none`} placeholder="Any extra notes…" />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="text-sm text-slate-500 px-4 py-2 hover:text-slate-700">Cancel</button>
+          <button onClick={save} disabled={saving}
+            className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
       </div>
     </div>
   )
