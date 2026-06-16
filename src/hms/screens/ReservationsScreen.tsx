@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
+import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle, Users, List, ChevronRight } from 'lucide-react'
 import type { HmsBooking, HmsBookingEmail, HmsHotel, HmsRoomType } from '../types'
 import EmailPreviewPanel from '../components/EmailPreviewPanel'
 import { Modal } from './RatesScreen'
@@ -22,7 +22,7 @@ const STATUS_COLORS: Record<string, string> = {
   'Cancelled': 'bg-red-100 text-red-700',
 }
 
-function buildEmailTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel', booking: HmsBooking, settings: Record<string, string>) {
+function buildEmailTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel' | 'reminder', booking: HmsBooking, settings: Record<string, string>) {
   const hotel = (booking as any).hms_hotels
   const room = (booking as any).hms_room_types
   const hotelName = hotel?.name ?? 'your hotel'
@@ -107,6 +107,32 @@ ${sig}`,
     }
   }
 
+  if (type === 'reminder') {
+    return {
+      to: toEmail,
+      subject: `Follow-up: Availability Request — ${checkin} to ${checkout} | ${hotelName}`,
+      body: `Dear Reservations Team,
+
+I hope you are doing well.
+
+I am following up on my previous availability request for the below reservation, as we have not yet received a response:
+
+• Hotel: ${hotelName}
+• Room Type: ${roomName}${mealPlan ? ` (${mealPlan})` : ''}
+• Check-in: ${checkin}
+• Check-out: ${checkout}
+• Duration: ${nights} night${nights !== 1 ? 's' : ''}
+• Rate: ${currency} ${rate}/night (as per our corporate contract)
+• Guests: Honeymoon couple
+
+Could you please kindly confirm availability at your earliest convenience? We would like to proceed with the booking as soon as possible.
+
+Thank you for your time and we look forward to hearing from you.
+
+${sig}`,
+    }
+  }
+
   // cancel
   return {
     to: toEmail,
@@ -135,6 +161,8 @@ export default function ReservationsScreen() {
   const [emailDraft, setEmailDraft] = useState<{ to: string; subject: string; body: string; bookingId: string } | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [statusFilter, setStatusFilter] = useState('All')
+  const [view, setView] = useState<'list' | 'clients'>('list')
+  const [openClient, setOpenClient] = useState<string | null>(null)
 
   const { data: bookings } = useQuery<HmsBooking[]>({
     queryKey: ['hms_bookings'],
@@ -147,7 +175,7 @@ export default function ReservationsScreen() {
     },
   })
 
-  async function useTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel', booking: HmsBooking) {
+  async function useTemplate(type: 'availability' | 'confirm' | 'payment' | 'cancel' | 'reminder', booking: HmsBooking) {
     const settings = await getSettings()
     const draft = buildEmailTemplate(type, booking, settings)
     setEmailDraft({ ...draft, bookingId: booking.id })
@@ -230,16 +258,52 @@ Agency signature: ${settings.agency_signature}`
   const pendingCount = (bookings ?? []).filter(b => b.status === 'Availability pending').length
   const confirmedCount = (bookings ?? []).filter(b => b.status === 'Confirmed').length
 
+  // Group bookings by client name for the Clients view
+  const clientGroups = filtered.reduce<Record<string, HmsBooking[]>>((acc, b) => {
+    const name = b.client_name || 'Unknown'
+    if (!acc[name]) acc[name] = []
+    acc[name].push(b)
+    return acc
+  }, {})
+
+  const renderBookingCard = (booking: HmsBooking) => (
+    <BookingCard
+      key={booking.id}
+      booking={booking}
+      expanded={openBooking === booking.id}
+      onToggle={() => setOpenBooking(openBooking === booking.id ? null : booking.id)}
+      onDraftEmail={() => draftAvailabilityEmail(booking)}
+      onTemplate={(type) => useTemplate(type, booking)}
+    />
+  )
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Reservations</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-1 text-sm bg-teal-600 text-white rounded-lg px-4 py-2 hover:bg-teal-700"
-        >
-          <Plus size={15} /> New Booking
-        </button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs">
+            <button
+              onClick={() => setView('list')}
+              className={`flex items-center gap-1 px-3 py-1.5 transition-colors ${view === 'list' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              <List size={13} /> All
+            </button>
+            <button
+              onClick={() => setView('clients')}
+              className={`flex items-center gap-1 px-3 py-1.5 transition-colors ${view === 'clients' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              <Users size={13} /> Clients
+            </button>
+          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1 text-sm bg-teal-600 text-white rounded-lg px-4 py-2 hover:bg-teal-700"
+          >
+            <Plus size={15} /> New Booking
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -264,21 +328,71 @@ Agency signature: ${settings.agency_signature}`
         ))}
       </div>
 
-      <div className="space-y-2">
-        {filtered.map(booking => (
-          <BookingCard
-            key={booking.id}
-            booking={booking}
-            expanded={openBooking === booking.id}
-            onToggle={() => setOpenBooking(openBooking === booking.id ? null : booking.id)}
-            onDraftEmail={() => draftAvailabilityEmail(booking)}
-            onTemplate={(type) => useTemplate(type, booking)}
-          />
-        ))}
-      </div>
+      {/* List view */}
+      {view === 'list' && (
+        <div className="space-y-2">
+          {filtered.map(renderBookingCard)}
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-slate-400">No bookings found.</div>
+          )}
+        </div>
+      )}
 
-      {filtered.length === 0 && (
-        <div className="text-center py-12 text-slate-400">No bookings found.</div>
+      {/* Clients view */}
+      {view === 'clients' && (
+        <div className="space-y-3">
+          {Object.keys(clientGroups).length === 0 && (
+            <div className="text-center py-12 text-slate-400">No clients found.</div>
+          )}
+          {Object.entries(clientGroups).sort(([a], [b]) => a.localeCompare(b)).map(([clientName, clientBookings]) => {
+            const isOpen = openClient === clientName
+            const statusCounts = clientBookings.reduce<Record<string, number>>((acc, b) => {
+              acc[b.status] = (acc[b.status] ?? 0) + 1
+              return acc
+            }, {})
+            const hasPending = (statusCounts['Availability pending'] ?? 0) > 0
+
+            return (
+              <div key={clientName} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <button
+                  className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  onClick={() => setOpenClient(isOpen ? null : clientName)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-sm font-bold shrink-0">
+                      {clientName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="font-medium text-slate-800">{clientName}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {clientBookings.length} booking{clientBookings.length !== 1 ? 's' : ''}
+                        {Object.entries(statusCounts).map(([s, n]) => (
+                          <span key={s} className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[s] ?? 'bg-slate-100 text-slate-600'}`}>
+                            {n} {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {hasPending && (
+                      <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        <AlertTriangle size={11} /> Awaiting reply
+                      </span>
+                    )}
+                    {isOpen ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-slate-100 px-3 py-3 space-y-2 bg-slate-50">
+                    {clientBookings.map(renderBookingCard)}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       )}
 
       {showForm && (
@@ -307,7 +421,7 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
   expanded: boolean
   onToggle: () => void
   onDraftEmail: () => void
-  onTemplate: (type: 'availability' | 'confirm' | 'payment' | 'cancel') => void
+  onTemplate: (type: 'availability' | 'confirm' | 'payment' | 'cancel' | 'reminder') => void
 }) {
   const qc = useQueryClient()
   const hotel = (booking as any).hms_hotels
@@ -445,6 +559,15 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate }: 
                 className="flex items-center gap-1 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5 hover:bg-teal-100">
                 <Mail size={13} /> Availability request
               </button>
+              {/* Reminder: shown when pending and we've already sent an email but have no received reply */}
+              {booking.status === 'Availability pending' &&
+                (emails ?? []).some(e => e.direction === 'sent') &&
+                !(emails ?? []).some(e => e.direction === 'received') && (
+                <button onClick={() => onTemplate('reminder')}
+                  className="flex items-center gap-1 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5 hover:bg-orange-100">
+                  <AlertTriangle size={13} /> Send reminder (no reply yet)
+                </button>
+              )}
               <button onClick={() => onTemplate('confirm')}
                 className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100">
                 <Mail size={13} /> Confirm reservation
