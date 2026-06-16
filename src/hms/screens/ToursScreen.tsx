@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Trash2, Copy, ChevronDown, ChevronUp, BookOpen, X, Check, Users, List, ChevronRight, Car, MapPin } from 'lucide-react'
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, BookOpen, X, Check, Users, List, ChevronRight, Car, Plane, PlaneLanding, PlaneTakeoff, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+type ActivityType = 'stop' | 'transfer' | 'airport-pickup' | 'airport-dropoff'
+
 interface ActivityItem {
   time: string
   description: string
-  type?: 'stop' | 'transfer'
+  type: ActivityType
   from?: string
   to?: string
   flight?: string
@@ -54,87 +56,81 @@ interface Hotel {
   city?: string
 }
 
-// ─── Transfer encoding helpers ────────────────────────────────────────────────
-
-const TRANSFER_PREFIX = '__transfer__:'
-const TRANSFER_SEP = '|||'
-
-function encodeTransfer(from: string, to: string, flight?: string): string {
-  const base = `${TRANSFER_PREFIX}${from}${TRANSFER_SEP}${to}`
-  return flight?.trim() ? `${base}${TRANSFER_SEP}flight:${flight.trim()}` : base
+interface ReservationClient {
+  name: string
+  confirmedHotels: string[]
+  totalBookings: number
 }
 
-function parseTransfer(description: string): { isTransfer: boolean; from: string; to: string; flight: string } {
-  if (description.startsWith(TRANSFER_PREFIX)) {
-    const rest = description.slice(TRANSFER_PREFIX.length)
-    const parts = rest.split(TRANSFER_SEP)
-    if (parts.length >= 2) {
-      const from = parts[0]
-      const to = parts[1]
-      const flight = parts[2]?.startsWith('flight:') ? parts[2].slice(7) : ''
-      return { isTransfer: true, from, to, flight }
-    }
+// ─── Encoding helpers ─────────────────────────────────────────────────────────
+
+const SEP = '|||'
+
+function encode(type: ActivityType, data: Record<string, string>): string {
+  return `__${type}__:` + Object.values(data).join(SEP)
+}
+
+function parseActivity(description: string): { type: ActivityType; from: string; to: string; flight: string; text: string } {
+  const match = description.match(/^__([a-z-]+)__:(.*)$/)
+  if (match) {
+    const type = match[1] as ActivityType
+    const parts = match[2].split(SEP)
+    if (type === 'transfer') return { type, from: parts[0] ?? '', to: parts[1] ?? '', flight: parts[2] ?? '', text: '' }
+    if (type === 'airport-pickup') return { type, from: '', to: parts[0] ?? '', flight: parts[1] ?? '', text: '' }
+    if (type === 'airport-dropoff') return { type, from: parts[0] ?? '', to: '', flight: parts[1] ?? '', text: '' }
   }
-  return { isTransfer: false, from: '', to: '', flight: '' }
+  return { type: 'stop', from: '', to: '', flight: '', text: description }
 }
 
-// Contact encoding stored in tour notes
+// Contact stored in tour notes with prefix
 const CONTACT_PREFIX = '__contact__:'
 function encodeContact(name: string, phone: string): string {
-  return `${CONTACT_PREFIX}${name.trim()}${TRANSFER_SEP}${phone.trim()}`
+  return `${CONTACT_PREFIX}${name.trim()}${SEP}${phone.trim()}`
 }
 function parseContact(notes: string | null): { contactName: string; contactPhone: string; cleanNotes: string } {
   if (!notes) return { contactName: '', contactPhone: '', cleanNotes: '' }
   const lines = notes.split('\n')
-  const contactLine = lines.find(l => l.startsWith(CONTACT_PREFIX))
-  if (!contactLine) return { contactName: '', contactPhone: '', cleanNotes: notes }
-  const rest = contactLine.slice(CONTACT_PREFIX.length)
-  const idx = rest.indexOf(TRANSFER_SEP)
-  const contactName = idx !== -1 ? rest.slice(0, idx) : rest
-  const contactPhone = idx !== -1 ? rest.slice(idx + TRANSFER_SEP.length) : ''
-  const cleanNotes = lines.filter(l => !l.startsWith(CONTACT_PREFIX)).join('\n').trim()
-  return { contactName, contactPhone, cleanNotes }
+  const cl = lines.find(l => l.startsWith(CONTACT_PREFIX))
+  if (!cl) return { contactName: '', contactPhone: '', cleanNotes: notes }
+  const rest = cl.slice(CONTACT_PREFIX.length)
+  const idx = rest.indexOf(SEP)
+  return {
+    contactName: idx !== -1 ? rest.slice(0, idx) : rest,
+    contactPhone: idx !== -1 ? rest.slice(idx + SEP.length) : '',
+    cleanNotes: lines.filter(l => !l.startsWith(CONTACT_PREFIX)).join('\n').trim(),
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDay(dateStr: string | null, dayNum: number) {
   if (!dateStr) return `Day ${dayNum}`
-  try {
-    return format(parseISO(dateStr), 'd MMM yyyy')
-  } catch {
-    return `Day ${dayNum}`
-  }
+  try { return format(parseISO(dateStr), 'd MMM yyyy') } catch { return `Day ${dayNum}` }
 }
 
 function buildWhatsApp(tour: Tour): string {
   const days = [...(tour.hms_tour_days ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   const { contactName, contactPhone, cleanNotes } = parseContact(tour.notes)
-  const lines: string[] = []
-  lines.push('🌼🌼')
-  lines.push(tour.client_name)
-  lines.push(`${tour.pax} pax`)
+  const lines: string[] = ['🌼🌼', tour.client_name, `${tour.pax} pax`]
   if (contactName) lines.push(`📞 ${contactName}${contactPhone ? ` — ${contactPhone}` : ''}`)
   for (const day of days) {
-    lines.push('')
-    lines.push('🌴')
-    lines.push(formatDay(day.date, day.sort_order + 1))
+    lines.push('', '🌴', formatDay(day.date, day.sort_order + 1))
     const acts = [...(day.hms_tour_activities ?? [])].sort((a, b) => a.sort_order - b.sort_order)
     for (const act of acts) {
-      const parsed = parseTransfer(act.description)
-      if (parsed.isTransfer) {
-        const flightNote = parsed.flight ? ` ✈️ ${parsed.flight}` : ''
-        lines.push(`${act.time} 🚗 Transfer: ${parsed.from} → ${parsed.to}${flightNote}`)
+      const p = parseActivity(act.description)
+      if (p.type === 'transfer') {
+        lines.push(`${act.time} 🚗 Transfer: ${p.from} → ${p.to}${p.flight ? ` (Flight: ${p.flight})` : ''}`)
+      } else if (p.type === 'airport-pickup') {
+        lines.push(`${act.time} ✈️ Airport Pickup: Flight ${p.flight} → ${p.to}`)
+      } else if (p.type === 'airport-dropoff') {
+        lines.push(`${act.time} 🛫 Airport Drop-off: ${p.from} → Flight ${p.flight}`)
       } else {
-        lines.push(`${act.time} ${act.description}`)
+        lines.push(`${act.time} ${p.text}`)
       }
     }
     lines.push('End of program')
   }
-  if (cleanNotes) {
-    lines.push('')
-    lines.push(cleanNotes)
-  }
+  if (cleanNotes) lines.push('', cleanNotes)
   return lines.join('\n')
 }
 
@@ -143,6 +139,7 @@ function normalizeClientKey(name: string): string {
 }
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inpSm = 'w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -376,21 +373,35 @@ function TourCard({ tour }: { tour: Tour }) {
                 </div>
                 <div className="space-y-0.5 pl-2">
                   {acts.map(act => {
-                    const parsed = parseTransfer(act.description)
-                    if (parsed.isTransfer) {
-                      return (
-                        <div key={act.id} className="text-sm text-slate-500 flex items-center gap-1.5 flex-wrap">
-                          <span className="text-slate-400 font-mono">{act.time}</span>
-                          <Car size={13} className="text-slate-400" />
-                          <span className="italic">{parsed.from} → {parsed.to}</span>
-                          {parsed.flight && <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded px-1.5 py-0.5 not-italic">✈️ {parsed.flight}</span>}
-                        </div>
-                      )
-                    }
+                    const p = parseActivity(act.description)
+                    if (p.type === 'transfer') return (
+                      <div key={act.id} className="flex items-center gap-1.5 text-sm text-slate-600 flex-wrap">
+                        <span className="font-mono text-slate-400 text-xs">{act.time}</span>
+                        <Car size={12} className="text-slate-400" />
+                        <span>{p.from} → {p.to}</span>
+                        {p.flight && <span className="text-xs bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">✈ {p.flight}</span>}
+                      </div>
+                    )
+                    if (p.type === 'airport-pickup') return (
+                      <div key={act.id} className="flex items-center gap-1.5 text-sm text-blue-700 flex-wrap">
+                        <span className="font-mono text-slate-400 text-xs">{act.time}</span>
+                        <PlaneLanding size={13} className="text-blue-500" />
+                        <span>Airport Pickup → {p.to}</span>
+                        {p.flight && <span className="text-xs bg-blue-50 border border-blue-200 text-blue-700 rounded px-1.5 py-0.5 font-medium">{p.flight}</span>}
+                      </div>
+                    )
+                    if (p.type === 'airport-dropoff') return (
+                      <div key={act.id} className="flex items-center gap-1.5 text-sm text-purple-700 flex-wrap">
+                        <span className="font-mono text-slate-400 text-xs">{act.time}</span>
+                        <PlaneTakeoff size={13} className="text-purple-500" />
+                        <span>Airport Drop-off from {p.from}</span>
+                        {p.flight && <span className="text-xs bg-purple-50 border border-purple-200 text-purple-700 rounded px-1.5 py-0.5 font-medium">{p.flight}</span>}
+                      </div>
+                    )
                     return (
                       <div key={act.id} className="text-sm text-slate-700">
-                        <span className="text-slate-400 font-mono mr-2">{act.time}</span>
-                        {act.description}
+                        <span className="text-slate-400 font-mono mr-2 text-xs">{act.time}</span>
+                        {p.text}
                       </div>
                     )
                   })}
@@ -536,8 +547,19 @@ interface DayDraft {
   activities: ActivityItem[]
 }
 
-function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; existingClients?: string[] }) {
+const TYPE_CONFIG = {
+  stop:           { label: '🏖 Tour Stop',       bg: 'bg-teal-50 border-teal-200 text-teal-700' },
+  transfer:       { label: '🚗 Transfer',         bg: 'bg-slate-100 border-slate-300 text-slate-700' },
+  'airport-pickup':  { label: '✈️ Airport Pickup',  bg: 'bg-blue-50 border-blue-300 text-blue-700' },
+  'airport-dropoff': { label: '🛫 Airport Drop-off', bg: 'bg-purple-50 border-purple-300 text-purple-700' },
+}
+const ACTIVITY_TYPES: ActivityType[] = ['stop', 'transfer', 'airport-pickup', 'airport-dropoff']
+
+function NewTourModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
+  const [step, setStep] = useState<'pick-client' | 'build'>('pick-client')
+  const [search, setSearch] = useState('')
+  const [selectedClient, setSelectedClient] = useState<ReservationClient | null>(null)
   const [clientName, setClientName] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
@@ -565,48 +587,54 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
     },
   })
 
-  // Fetch this client's confirmed hotel names to prioritise in transfer dropdowns
-  const { data: clientBookings = [] } = useQuery({
-    queryKey: ['hms_bookings_client', clientName],
-    queryFn: async () => {
-      if (!clientName.trim()) return []
-      const { data } = await supabase
-        .from('hms_bookings')
-        .select('hms_hotels(name, city)')
-        .ilike('client_name', clientName.trim())
-        .in('status', ['Confirmed', 'Paid'])
-      return data ?? []
-    },
-    enabled: !!clientName.trim(),
-  })
-
-  const confirmedHotelNames: string[] = Array.from(new Set(
-    clientBookings.map((b: any) => b.hms_hotels?.name).filter(Boolean)
-  ))
-
-  // Fetch existing tours for client autocomplete
-  const { data: toursForClients = [] } = useQuery<Tour[]>({
-    queryKey: ['hms_tours'],
+  // Fetch reservation clients (hms_bookings grouped by client name)
+  const { data: reservationClients = [] } = useQuery<ReservationClient[]>({
+    queryKey: ['hms_reservation_clients'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('hms_tours')
-        .select('id, client_name, pax, notes, created_at, hms_tour_days(id, tour_id, date, sort_order, hms_tour_activities(id, day_id, time, description, sort_order))')
-        .order('created_at', { ascending: false })
+        .from('hms_bookings')
+        .select('client_name, status, hms_hotels(name)')
       if (error) throw error
-      return data ?? []
+      const map = new Map<string, { displayName: string; hotels: Set<string>; count: number }>()
+      for (const b of data ?? []) {
+        const key = normalizeClientKey(b.client_name)
+        if (!map.has(key)) map.set(key, { displayName: b.client_name, hotels: new Set(), count: 0 })
+        const entry = map.get(key)!
+        entry.count++
+        if ((b.status === 'Confirmed' || b.status === 'Paid') && (b as any).hms_hotels?.name) {
+          entry.hotels.add((b as any).hms_hotels.name)
+        }
+      }
+      return Array.from(map.values())
+        .map(e => ({ name: e.displayName, confirmedHotels: Array.from(e.hotels), totalBookings: e.count }))
+        .sort((a, b) => a.name.localeCompare(b.name))
     },
   })
 
-  const clientNames = Array.from(
-    new Map(toursForClients.map(t => [normalizeClientKey(t.client_name), t.client_name])).values()
-  ).sort((a, b) => a.localeCompare(b))
-
-  // Confirmed hotels first, then all hotels (deduped)
+  const confirmedHotels: string[] = selectedClient?.confirmedHotels ?? []
   const allHotelNames = hotels.map(h => h.city ? `${h.name}, ${h.city}` : h.name)
   const hotelOptions = [
-    ...confirmedHotelNames,
-    ...allHotelNames.filter(n => !confirmedHotelNames.some(c => n.startsWith(c))),
+    ...confirmedHotels,
+    ...allHotelNames.filter(n => !confirmedHotels.some(c => n.startsWith(c))),
   ]
+
+  const filteredClients = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return reservationClients
+    return reservationClients.filter(c => c.name.toLowerCase().includes(q))
+  }, [reservationClients, search])
+
+  function pickClient(client: ReservationClient) {
+    setSelectedClient(client)
+    setClientName(client.name)
+    setStep('build')
+  }
+
+  function pickNewClient() {
+    setSelectedClient(null)
+    setClientName(search.trim())
+    setStep('build')
+  }
 
   function addDay() {
     setDays(d => [...d, { date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
@@ -627,15 +655,16 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
     }))
   }
 
-  function toggleActivityType(dayIdx: number, actIdx: number) {
+  function cycleActivityType(dayIdx: number, actIdx: number) {
     setDays(d => d.map((day, j) => j !== dayIdx ? day : {
       ...day,
       activities: day.activities.map((a, k) => k !== actIdx ? a : {
         ...a,
-        type: a.type === 'transfer' ? 'stop' : 'transfer',
+        type: ACTIVITY_TYPES[(ACTIVITY_TYPES.indexOf(a.type) + 1) % ACTIVITY_TYPES.length],
         description: '',
         from: '',
         to: '',
+        flight: '',
       }),
     }))
   }
@@ -683,22 +712,22 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
           .single()
         if (dErr) throw dErr
 
-        // Convert UI state to DB description strings
         const acts = day.activities.filter(a => {
           if (a.type === 'transfer') return (a.from || '').trim() || (a.to || '').trim()
+          if (a.type === 'airport-pickup') return (a.to || '').trim()
+          if (a.type === 'airport-dropoff') return (a.from || '').trim()
           return a.description.trim()
         })
 
         if (acts.length) {
           const { error: aErr } = await supabase.from('hms_tour_activities').insert(
-            acts.map((a, k) => ({
-              day_id: dayRow.id,
-              time: a.time,
-              description: a.type === 'transfer'
-                ? encodeTransfer(a.from ?? '', a.to ?? '', a.flight)
-                : a.description,
-              sort_order: k,
-            }))
+            acts.map((a, k) => {
+              let description = a.description
+              if (a.type === 'transfer') description = encode('transfer', { from: a.from ?? '', to: a.to ?? '', flight: a.flight ?? '' })
+              else if (a.type === 'airport-pickup') description = encode('airport-pickup', { to: a.to ?? '', flight: a.flight ?? '' })
+              else if (a.type === 'airport-dropoff') description = encode('airport-dropoff', { from: a.from ?? '', flight: a.flight ?? '' })
+              return { day_id: dayRow.id, time: a.time, description, sort_order: k }
+            })
           )
           if (aErr) throw aErr
         }
@@ -718,212 +747,361 @@ function NewTourModal({ onClose, existingClients = [] }: { onClose: () => void; 
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8 px-4">
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-slate-800">New Tour Itinerary</h2>
+          <div className="flex items-center gap-3">
+            {step === 'build' && (
+              <button onClick={() => setStep('pick-client')} className="text-slate-400 hover:text-slate-600">
+                <ChevronRight size={16} className="rotate-180" />
+              </button>
+            )}
+            <h2 className="text-lg font-bold text-slate-800">
+              {step === 'pick-client' ? 'Select Client' : 'Build Itinerary'}
+            </h2>
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
         </div>
 
-        <div className="p-6 space-y-5">
-          {/* Client info */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-slate-600 mb-1">Client Name</label>
+        {/* ── Step 1: Client Picker ── */}
+        {step === 'pick-client' && (
+          <div className="p-6 space-y-4">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                value={clientName}
-                onChange={e => setClientName(e.target.value)}
-                className={inp}
-                placeholder="e.g. Ahmed & Sara"
-                list="client-names-list"
+                autoFocus
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className={`${inp} pl-9`}
+                placeholder="Search reservation clients…"
               />
-              <datalist id="client-names-list">
-                {clientNames.map(name => <option key={name} value={name} />)}
-              </datalist>
-              {confirmedHotelNames.length > 0 && (
-                <div className="mt-1 flex items-center gap-1 flex-wrap">
-                  <span className="text-[10px] text-slate-400">Confirmed hotels:</span>
-                  {confirmedHotelNames.map(h => (
-                    <span key={h} className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 rounded px-1.5 py-0.5">{h}</span>
-                  ))}
+            </div>
+
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {filteredClients.map(client => (
+                <button
+                  key={normalizeClientKey(client.name)}
+                  onClick={() => pickClient(client)}
+                  className="w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-colors group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {client.name.trim()[0]?.toUpperCase() ?? '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-800 group-hover:text-teal-800">{client.name}</div>
+                    <div className="text-xs text-slate-500">{client.totalBookings} booking{client.totalBookings !== 1 ? 's' : ''}</div>
+                    {client.confirmedHotels.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {client.confirmedHotels.map(h => (
+                          <span key={h} className="text-[10px] bg-teal-100 text-teal-700 rounded px-1.5 py-0.5">{h}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <ChevronRight size={14} className="text-slate-300 group-hover:text-teal-500 flex-shrink-0" />
+                </button>
+              ))}
+
+              {/* New client option */}
+              <button
+                onClick={pickNewClient}
+                className="w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-dashed border-gray-300 hover:border-teal-400 hover:bg-teal-50 transition-colors"
+              >
+                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-slate-400 flex-shrink-0">
+                  <Plus size={16} />
                 </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Pax</label>
-              <input type="number" min={1} value={pax} onChange={e => setPax(Number(e.target.value))} className={inp} />
-            </div>
-          </div>
-
-          {/* Contact details */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Contact name</label>
-              <input value={contactName} onChange={e => setContactName(e.target.value)} className={inp} placeholder="e.g. Ahmed Mohamed" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Contact phone</label>
-              <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} className={inp} placeholder="+20 100 000 0000" />
+                <div>
+                  <div className="font-medium text-slate-600">
+                    {search.trim() ? `New client: "${search.trim()}"` : 'New client (not in reservations)'}
+                  </div>
+                  <div className="text-xs text-slate-400">Enter name on next step</div>
+                </div>
+              </button>
             </div>
           </div>
+        )}
 
-          {/* Days */}
-          {days.map((day, dayIdx) => (
-            <div key={dayIdx} className="border border-gray-200 rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-teal-700">🌴 Day {dayIdx + 1}</span>
+        {/* ── Step 2: Build Itinerary ── */}
+        {step === 'build' && (
+          <>
+            <div className="p-6 space-y-5">
+              {/* Selected client card */}
+              <div className="flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
+                <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                  {(clientName || '?').trim()[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
                   <input
-                    type="date"
-                    value={day.date}
-                    onChange={e => setDayDate(dayIdx, e.target.value)}
-                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                    value={clientName}
+                    onChange={e => setClientName(e.target.value)}
+                    className="font-semibold text-slate-800 bg-transparent w-full focus:outline-none focus:underline text-sm"
+                    placeholder="Client name"
                   />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowLibrary(showLibrary === dayIdx ? null : dayIdx)}
-                    className="flex items-center gap-1 text-xs border border-gray-300 rounded-lg px-2 py-1 text-slate-600 hover:bg-gray-50"
-                  >
-                    <BookOpen size={12} /> Template
-                  </button>
-                  {days.length > 1 && (
-                    <button onClick={() => removeDay(dayIdx)} className="text-slate-400 hover:text-red-500">
-                      <Trash2 size={14} />
-                    </button>
+                  {confirmedHotels.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {confirmedHotels.map(h => (
+                        <span key={h} className="text-[10px] bg-teal-200 text-teal-800 rounded px-1.5 py-0.5 font-medium">{h}</span>
+                      ))}
+                    </div>
                   )}
                 </div>
+                <button onClick={() => setStep('pick-client')} className="text-xs text-teal-600 hover:underline flex-shrink-0">Change</button>
               </div>
 
-              {/* Template picker */}
-              {showLibrary === dayIdx && (
-                <div className="bg-gray-50 rounded-lg p-2 space-y-1 border border-gray-200">
-                  <div className="text-xs text-slate-500 px-1 mb-1">Pick a template</div>
-                  {templates.map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => applyTemplate(dayIdx, t)}
-                      className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-700"
-                    >
-                      {t.icon} {t.name}
-                      <span className="text-xs text-slate-400 ml-2">({t.activities.length} stops)</span>
-                    </button>
-                  ))}
-                  {!templates.length && <div className="text-xs text-slate-400 px-2">No templates yet — add them in Activity Library</div>}
+              {/* Pax + contact */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Pax</label>
+                  <input type="number" min={1} value={pax} onChange={e => setPax(Number(e.target.value))} className={inp} />
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Contact name</label>
+                  <input value={contactName} onChange={e => setContactName(e.target.value)} className={inp} placeholder="Ahmed Mohamed" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Contact phone</label>
+                  <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} className={inp} placeholder="+20 100…" />
+                </div>
+              </div>
 
-              {/* Activities */}
-              <div className="space-y-2">
-                {day.activities.map((act, actIdx) => (
-                  <div key={actIdx} className="flex gap-2 items-start">
-                    {/* Type toggle */}
-                    <button
-                      type="button"
-                      onClick={() => toggleActivityType(dayIdx, actIdx)}
-                      title={act.type === 'transfer' ? 'Switch to stop' : 'Switch to transfer'}
-                      className={`flex-shrink-0 mt-0.5 flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ${
-                        act.type === 'transfer'
-                          ? 'bg-slate-100 border-slate-300 text-slate-700'
-                          : 'bg-teal-50 border-teal-200 text-teal-700'
-                      }`}
-                    >
-                      {act.type === 'transfer' ? <><Car size={11} /> Transfer</> : <>🏖 Stop</>}
-                    </button>
-
-                    {/* Time field (always) */}
-                    <input
-                      value={act.time}
-                      onChange={e => setActivity(dayIdx, actIdx, 'time', e.target.value)}
-                      className={`${inp} w-24 flex-shrink-0`}
-                      placeholder="09:00"
-                    />
-
-                    {act.type === 'transfer' ? (
-                      <div className="flex-1 space-y-1.5">
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <input
-                              value={act.from ?? ''}
-                              onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
-                              className={inp}
-                              placeholder="From"
-                              list={`hotels-from-${dayIdx}-${actIdx}`}
-                            />
-                            <datalist id={`hotels-from-${dayIdx}-${actIdx}`}>
-                              {hotelOptions.map(h => <option key={h} value={h} />)}
-                            </datalist>
-                          </div>
-                          <div className="flex items-center text-slate-400 flex-shrink-0 mt-2">→</div>
-                          <div className="flex-1">
-                            <input
-                              value={act.to ?? ''}
-                              onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
-                              className={inp}
-                              placeholder="To"
-                              list={`hotels-to-${dayIdx}-${actIdx}`}
-                            />
-                            <datalist id={`hotels-to-${dayIdx}-${actIdx}`}>
-                              {hotelOptions.map(h => <option key={h} value={h} />)}
-                            </datalist>
-                          </div>
-                        </div>
-                        <input
-                          value={act.flight ?? ''}
-                          onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
-                          className={inp}
-                          placeholder="✈️ Flight number (optional, e.g. MS985)"
-                        />
-                      </div>
-                    ) : (
-                      /* Stop: description field */
+              {/* Days */}
+              {days.map((day, dayIdx) => (
+                <div key={dayIdx} className="border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-teal-700">🌴 Day {dayIdx + 1}</span>
                       <input
-                        value={act.description}
-                        onChange={e => setActivity(dayIdx, actIdx, 'description', e.target.value)}
-                        className={inp}
-                        placeholder="Activity / hotel check-in…"
+                        type="date"
+                        value={day.date}
+                        onChange={e => setDayDate(dayIdx, e.target.value)}
+                        className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400"
                       />
-                    )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShowLibrary(showLibrary === dayIdx ? null : dayIdx)}
+                        className="flex items-center gap-1 text-xs border border-gray-300 rounded-lg px-2 py-1 text-slate-600 hover:bg-gray-50"
+                      >
+                        <BookOpen size={12} /> Template
+                      </button>
+                      {days.length > 1 && (
+                        <button onClick={() => removeDay(dayIdx)} className="text-slate-400 hover:text-red-500">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-                    <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0 mt-1.5">
-                      <X size={14} />
+                  {showLibrary === dayIdx && (
+                    <div className="bg-gray-50 rounded-lg p-2 space-y-1 border border-gray-200">
+                      <div className="text-xs text-slate-500 px-1 mb-1">Pick a template</div>
+                      {templates.map(t => (
+                        <button
+                          key={t.id}
+                          onClick={() => applyTemplate(dayIdx, t)}
+                          className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-700"
+                        >
+                          {t.icon} {t.name}
+                          <span className="text-xs text-slate-400 ml-2">({t.activities.length} stops)</span>
+                        </button>
+                      ))}
+                      {!templates.length && <div className="text-xs text-slate-400 px-2">No templates yet</div>}
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {day.activities.map((act, actIdx) => {
+                      const cfg = TYPE_CONFIG[act.type]
+                      return (
+                        <div key={actIdx} className="space-y-1.5">
+                          <div className="flex gap-2 items-center">
+                            <button
+                              type="button"
+                              onClick={() => cycleActivityType(dayIdx, actIdx)}
+                              className={`flex-shrink-0 flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ${cfg.bg}`}
+                            >
+                              {cfg.label}
+                            </button>
+                            <input
+                              value={act.time}
+                              onChange={e => setActivity(dayIdx, actIdx, 'time', e.target.value)}
+                              className={`${inp} w-24 flex-shrink-0`}
+                              placeholder="09:00"
+                            />
+                            <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0 ml-auto">
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          {act.type === 'stop' && (
+                            <input
+                              value={act.description}
+                              onChange={e => setActivity(dayIdx, actIdx, 'description', e.target.value)}
+                              className={inp}
+                              placeholder="Activity / hotel check-in…"
+                            />
+                          )}
+
+                          {act.type === 'transfer' && (
+                            <div className="space-y-1.5 pl-1">
+                              <div className="flex gap-2 items-center">
+                                <div className="flex-1">
+                                  <input
+                                    value={act.from ?? ''}
+                                    onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                                    className={inp}
+                                    placeholder="From hotel / location"
+                                    list={`from-${dayIdx}-${actIdx}`}
+                                  />
+                                  <datalist id={`from-${dayIdx}-${actIdx}`}>
+                                    {hotelOptions.map(h => <option key={h} value={h} />)}
+                                  </datalist>
+                                </div>
+                                <span className="text-slate-400 text-xs flex-shrink-0">→</span>
+                                <div className="flex-1">
+                                  <input
+                                    value={act.to ?? ''}
+                                    onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                                    className={inp}
+                                    placeholder="To hotel / location"
+                                    list={`to-${dayIdx}-${actIdx}`}
+                                  />
+                                  <datalist id={`to-${dayIdx}-${actIdx}`}>
+                                    {hotelOptions.map(h => <option key={h} value={h} />)}
+                                  </datalist>
+                                </div>
+                              </div>
+                              {/* Confirmed hotel chips for quick-fill */}
+                              {confirmedHotels.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {confirmedHotels.map(h => (
+                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
+                                      className="text-[10px] bg-slate-100 hover:bg-teal-100 text-slate-600 hover:text-teal-800 border border-slate-200 rounded px-1.5 py-0.5 transition-colors">
+                                      → {h}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {act.type === 'airport-pickup' && (
+                            <div className="space-y-1.5 pl-1">
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">✈️ Arrival Flight</label>
+                                  <input
+                                    value={act.flight ?? ''}
+                                    onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                                    className={inp}
+                                    placeholder="e.g. MS985"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">Drop to hotel</label>
+                                  <input
+                                    value={act.to ?? ''}
+                                    onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                                    className={inp}
+                                    placeholder="Hotel / destination"
+                                    list={`pickup-to-${dayIdx}-${actIdx}`}
+                                  />
+                                  <datalist id={`pickup-to-${dayIdx}-${actIdx}`}>
+                                    {hotelOptions.map(h => <option key={h} value={h} />)}
+                                  </datalist>
+                                </div>
+                              </div>
+                              {confirmedHotels.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
+                                  {confirmedHotels.map(h => (
+                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
+                                      className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 transition-colors">
+                                      {h}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {act.type === 'airport-dropoff' && (
+                            <div className="space-y-1.5 pl-1">
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">Pick up from hotel</label>
+                                  <input
+                                    value={act.from ?? ''}
+                                    onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                                    className={inp}
+                                    placeholder="Hotel / pickup location"
+                                    list={`dropoff-from-${dayIdx}-${actIdx}`}
+                                  />
+                                  <datalist id={`dropoff-from-${dayIdx}-${actIdx}`}>
+                                    {hotelOptions.map(h => <option key={h} value={h} />)}
+                                  </datalist>
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">🛫 Departure Flight</label>
+                                  <input
+                                    value={act.flight ?? ''}
+                                    onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                                    className={inp}
+                                    placeholder="e.g. MS986"
+                                  />
+                                </div>
+                              </div>
+                              {confirmedHotels.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
+                                  {confirmedHotels.map(h => (
+                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'from', h)}
+                                      className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5 transition-colors">
+                                      {h}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                    <button onClick={() => addActivity(dayIdx)} className="text-xs text-teal-600 hover:underline">
+                      + Add activity
                     </button>
                   </div>
-                ))}
-                <button onClick={() => addActivity(dayIdx)} className="text-xs text-teal-600 hover:underline">
-                  + Add stop
-                </button>
+                </div>
+              ))}
+
+              <button
+                onClick={addDay}
+                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-slate-500 hover:border-teal-400 hover:text-teal-600 transition-colors"
+              >
+                + Add Day
+              </button>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Notes (optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  rows={2}
+                  className={`${inp} resize-none`}
+                  placeholder="Any extra notes…"
+                />
               </div>
             </div>
-          ))}
 
-          <button
-            onClick={addDay}
-            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-slate-500 hover:border-teal-400 hover:text-teal-600 transition-colors"
-          >
-            + Add Day
-          </button>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Notes (optional)</label>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
-              className={`${inp} resize-none`}
-              placeholder="Any extra notes appended at the bottom of the WhatsApp message…"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="text-sm text-slate-500 px-4 py-2 hover:text-slate-700">Cancel</button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Create Tour'}
-          </button>
-        </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button onClick={onClose} className="text-sm text-slate-500 px-4 py-2 hover:text-slate-700">Cancel</button>
+              <button
+                onClick={save}
+                disabled={saving}
+                className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Create Tour'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
