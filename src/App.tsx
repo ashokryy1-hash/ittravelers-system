@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import { SessionProvider } from './context/SessionContext'
 import HomeScreen from './screens/HomeScreen'
 import DestinationScreen from './screens/DestinationScreen'
+import VietnamScreen from './screens/VietnamScreen'
 import AreaScreen from './screens/AreaScreen'
 import SummaryScreen from './screens/SummaryScreen'
 import AdminScreen from './screens/AdminScreen'
@@ -40,6 +41,8 @@ export default function App() {
             <Route path="/" element={<HomeScreen />} />
             <Route path="/bali" element={<DestinationScreen />} />
             <Route path="/bali/:cityId" element={<AreaScreen />} />
+            <Route path="/vietnam" element={<VietnamScreen />} />
+            <Route path="/vietnam/:cityId" element={<AreaScreen />} />
             <Route path="/summary" element={<SummaryScreen />} />
             <Route path="/admin" element={<AdminScreen />} />
 

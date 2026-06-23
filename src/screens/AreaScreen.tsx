@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Building2, Map } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -23,6 +23,8 @@ function getHotelGroup(name: string): string {
 export default function AreaScreen() {
   const { cityId } = useParams<{ cityId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const destSlug = location.pathname.split('/')[1] // 'bali' or 'vietnam'
   const { totalCount } = useSession()
   const [activeTab, setActiveTab] = useState<Tab>('hotels')
   const [tourCategory, setTourCategory] = useState<string>('All')
@@ -106,7 +108,7 @@ export default function AreaScreen() {
       <div className="min-h-screen bg-ivory-100 flex items-center justify-center">
         <div className="text-center">
           <p className="font-body text-gray-500 mb-4">Area not found.</p>
-          <button onClick={() => navigate('/bali')} className="text-terracotta-500 underline">Back to Bali</button>
+          <button onClick={() => navigate('/' + destSlug)} className="text-terracotta-500 underline">Back to Bali</button>
         </div>
       </div>
     )
@@ -118,11 +120,11 @@ export default function AreaScreen() {
       <div className="bg-white border-b border-ivory-300 sticky top-0 z-40 shadow-sm">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
-            onClick={() => navigate('/bali')}
+            onClick={() => navigate('/' + destSlug)}
             className="flex items-center gap-2 text-terracotta-600 hover:text-terracotta-700 font-body text-sm font-medium transition-colors"
           >
             <ArrowLeft size={16} />
-            Bali
+            {destSlug.charAt(0).toUpperCase() + destSlug.slice(1)}
           </button>
           {totalCount > 0 && (
             <button

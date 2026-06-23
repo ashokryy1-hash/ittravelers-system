@@ -98,23 +98,22 @@ export default function HomeScreen() {
           </div>
 
           {/* Vietnam */}
-          <div className="relative rounded-2xl overflow-hidden shadow-md aspect-[3/4]">
+          <button
+            onClick={() => navigate('/vietnam')}
+            className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 aspect-[3/4] cursor-pointer"
+          >
             <img
               src={DESTINATIONS[2].fallbackImage}
               alt="Vietnam"
-              className="absolute inset-0 w-full h-full object-cover grayscale opacity-60"
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-gray-700/20 to-transparent" />
-            <div className="absolute top-4 right-4">
-              <span className="bg-gray-700/80 text-gray-200 text-xs font-body font-medium px-3 py-1 rounded-full uppercase tracking-wider">
-                Coming Soon
-              </span>
-            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-terracotta-900/80 via-terracotta-800/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6 text-left">
-              <p className="font-body text-gray-400 text-xs uppercase tracking-widest mb-1">Vietnam</p>
-              <h2 className="font-display text-gray-300 text-4xl">Vietnam</h2>
+              <p className="font-body text-ivory-200 text-xs uppercase tracking-widest mb-1">Vietnam</p>
+              <h2 className="font-display text-white text-4xl">Vietnam</h2>
+              <p className="font-body text-ivory-300 text-sm mt-1">Explore →</p>
             </div>
-          </div>
+          </button>
         </div>
       </main>
 
