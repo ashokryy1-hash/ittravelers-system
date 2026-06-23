@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Building2, Map } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSession } from '../context/SessionContext'
 import HotelCard from '../components/HotelCard'
@@ -10,10 +10,21 @@ import type { City, Hotel, Tour } from '../types'
 
 const TOUR_CATEGORIES = ['All', 'Romantic', 'Adventure', 'Cultural', 'Nature', 'Water', 'Nightlife', 'Beach Club'] as const
 
+type Tab = 'hotels' | 'tours'
+
+function getHotelGroup(name: string): string {
+  const n = name.toLowerCase()
+  if (n.includes('luxury resort') || n.includes('resort & spa') || n.includes('resort and spa')) return 'Resorts & Spas'
+  if (n.includes('villa')) return 'Villas'
+  if (n.includes('resort')) return 'Resorts'
+  return 'Boutique & Other'
+}
+
 export default function AreaScreen() {
   const { cityId } = useParams<{ cityId: string }>()
   const navigate = useNavigate()
   const { totalCount } = useSession()
+  const [activeTab, setActiveTab] = useState<Tab>('hotels')
   const [tourCategory, setTourCategory] = useState<string>('All')
 
   const { data: city, isLoading: loadingCity } = useQuery<City | null>({
@@ -69,6 +80,19 @@ export default function AreaScreen() {
     t => tourCategory === 'All' || t.category === tourCategory
   ) ?? []
 
+  // Group hotels by type
+  const hotelGroups: Record<string, Hotel[]> = {}
+  for (const hotel of hotels ?? []) {
+    const group = getHotelGroup(hotel.name)
+    if (!hotelGroups[group]) hotelGroups[group] = []
+    hotelGroups[group].push(hotel)
+  }
+  const groupOrder = ['Resorts & Spas', 'Resorts', 'Villas', 'Boutique & Other']
+  const sortedGroups = groupOrder.filter(g => hotelGroups[g]?.length > 0)
+
+  const hotelCount = hotels?.length ?? 0
+  const tourCount = tours?.length ?? 0
+
   if (loadingCity) {
     return (
       <div className="min-h-screen bg-ivory-100 flex items-center justify-center">
@@ -119,62 +143,105 @@ export default function AreaScreen() {
         )}
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 pb-16 space-y-12">
-        {/* Hotels section */}
-        {city.has_hotels && (
-          <section>
-            <h2 className="font-display text-3xl text-terracotta-700 mb-6 pb-2 border-b border-ivory-300">
+      {/* Tabs */}
+      <div className="max-w-5xl mx-auto px-6">
+        <div className="flex gap-1 bg-white border border-ivory-300 rounded-xl p-1 w-fit shadow-sm">
+          {city.has_hotels && (
+            <button
+              onClick={() => setActiveTab('hotels')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-body font-medium transition-all ${
+                activeTab === 'hotels'
+                  ? 'bg-terracotta-500 text-white shadow-sm'
+                  : 'text-stone-500 hover:text-terracotta-600 hover:bg-ivory-100'
+              }`}
+            >
+              <Building2 size={15} />
               Hotels & Villas
-            </h2>
+              {hotelCount > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'hotels' ? 'bg-white/20 text-white' : 'bg-ivory-200 text-stone-500'}`}>
+                  {hotelCount}
+                </span>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => setActiveTab('tours')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-body font-medium transition-all ${
+              activeTab === 'tours'
+                ? 'bg-terracotta-500 text-white shadow-sm'
+                : 'text-stone-500 hover:text-terracotta-600 hover:bg-ivory-100'
+            }`}
+          >
+            <Map size={15} />
+            Tours & Experiences
+            {tourCount > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'tours' ? 'bg-white/20 text-white' : 'bg-ivory-200 text-stone-500'}`}>
+                {tourCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-6 py-8 pb-16">
+
+        {/* Hotels tab */}
+        {activeTab === 'hotels' && city.has_hotels && (
+          <div className="space-y-10">
             {loadingHotels ? (
               <p className="font-body text-gray-400 italic">Loading hotels...</p>
             ) : !hotels || hotels.length === 0 ? (
               <p className="font-body text-gray-400 italic">No hotels listed yet for this area.</p>
             ) : (
+              sortedGroups.map(group => (
+                <section key={group}>
+                  <h2 className="font-display text-2xl text-terracotta-700 mb-4 pb-2 border-b border-ivory-300">
+                    {group}
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {hotelGroups[group].map(hotel => (
+                      <HotelCard key={hotel.id} hotel={hotel} city={city} />
+                    ))}
+                  </div>
+                </section>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Tours tab */}
+        {activeTab === 'tours' && (
+          <div>
+            {/* Category filter */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              {TOUR_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setTourCategory(cat)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-body font-medium border transition-colors ${
+                    tourCategory === cat
+                      ? 'bg-terracotta-500 text-white border-terracotta-500'
+                      : 'bg-white text-gray-500 border-ivory-300 hover:border-terracotta-300 hover:text-terracotta-500'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {loadingTours ? (
+              <p className="font-body text-gray-400 italic">Loading tours...</p>
+            ) : filteredTours.length === 0 ? (
+              <p className="font-body text-gray-400 italic">No tours available in this category for {city.name}.</p>
+            ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {hotels.map(hotel => (
-                  <HotelCard key={hotel.id} hotel={hotel} city={city} />
+                {filteredTours.map(tour => (
+                  <TourCard key={tour.id} tour={tour} city={city} />
                 ))}
               </div>
             )}
-          </section>
-        )}
-
-        {/* Tours section */}
-        <section>
-          <h2 className="font-display text-3xl text-terracotta-700 mb-4 pb-2 border-b border-ivory-300">
-            Tours & Experiences
-          </h2>
-
-          {/* Category filter */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {TOUR_CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setTourCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-xs font-body font-medium border transition-colors ${
-                  tourCategory === cat
-                    ? 'bg-terracotta-500 text-white border-terracotta-500'
-                    : 'bg-white text-gray-500 border-ivory-300 hover:border-terracotta-300 hover:text-terracotta-500'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
           </div>
-
-          {loadingTours ? (
-            <p className="font-body text-gray-400 italic">Loading tours...</p>
-          ) : filteredTours.length === 0 ? (
-            <p className="font-body text-gray-400 italic">No tours available in this category for {city.name}.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredTours.map(tour => (
-                <TourCard key={tour.id} tour={tour} city={city} />
-              ))}
-            </div>
-          )}
-        </section>
+        )}
       </div>
     </div>
   )
