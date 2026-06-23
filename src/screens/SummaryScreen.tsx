@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Copy, Trash2 } from 'lucide-react'
+import { ArrowLeft, Copy, Trash2, User, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useSession } from '../context/SessionContext'
 import type { SessionSelection } from '../types'
@@ -12,24 +13,27 @@ function groupByCity(selections: SessionSelection[]): Record<string, SessionSele
   }, {})
 }
 
-function buildSummaryText(grouped: Record<string, SessionSelection[]>): string {
+function buildSummaryText(
+  grouped: Record<string, SessionSelection[]>,
+  clientName: string,
+  tripDate: string,
+): string {
   const lines: string[] = ['ITTravelers Trip Explorer — Session Summary', '']
+  if (clientName) lines.push(`Client: ${clientName}`)
+  if (tripDate) lines.push(`Trip Start Date: ${new Date(tripDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`)
+  if (clientName || tripDate) lines.push('')
+
   for (const [city, items] of Object.entries(grouped)) {
     lines.push(city.toUpperCase())
     const hotels = items.filter(i => i.type === 'hotel')
     const tours = items.filter(i => i.type === 'tour')
     if (hotels.length > 0) {
       lines.push('Hotels:')
-      hotels.forEach(h => {
-        const stars = '★'.repeat(0) // no prices, just name
-        lines.push(`  - ${h.name}`)
-      })
+      hotels.forEach(h => lines.push(`  - ${h.name}`))
     }
     if (tours.length > 0) {
       lines.push('Tours:')
-      tours.forEach(t => {
-        lines.push(`  - ${t.name}${t.details ? ` (${t.details})` : ''}`)
-      })
+      tours.forEach(t => lines.push(`  - ${t.name}${t.details ? ` (${t.details})` : ''}`))
     }
     lines.push('')
   }
@@ -39,11 +43,13 @@ function buildSummaryText(grouped: Record<string, SessionSelection[]>): string {
 export default function SummaryScreen() {
   const navigate = useNavigate()
   const { selections, clearSession, totalCount } = useSession()
+  const [clientName, setClientName] = useState('')
+  const [tripDate, setTripDate] = useState('')
 
   const grouped = groupByCity(selections)
 
   const handleCopy = async () => {
-    const text = buildSummaryText(grouped)
+    const text = buildSummaryText(grouped, clientName, tripDate)
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Summary copied to clipboard!')
@@ -90,6 +96,32 @@ export default function SummaryScreen() {
           </div>
         ) : (
           <>
+            {/* Client details form */}
+            <div className="bg-white border border-ivory-200 rounded-2xl p-5 mb-6 shadow-sm">
+              <p className="font-body text-xs uppercase tracking-wider text-gray-400 mb-4">Client Details</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-center gap-3">
+                  <User size={16} className="text-terracotta-400 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Client name"
+                    value={clientName}
+                    onChange={e => setClientName(e.target.value)}
+                    className="w-full border border-ivory-300 rounded-lg px-3 py-2 font-body text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 transition"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Calendar size={16} className="text-terracotta-400 shrink-0" />
+                  <input
+                    type="date"
+                    value={tripDate}
+                    onChange={e => setTripDate(e.target.value)}
+                    className="w-full border border-ivory-300 rounded-lg px-3 py-2 font-body text-sm text-gray-700 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 transition"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Action buttons */}
             <div className="flex gap-3 mb-8">
               <button
