@@ -515,8 +515,35 @@ function TripLibraryTab({ trips, leads, isLoading }: { trips: Trip[]; leads: Lea
               <input value={form.program_link} onChange={set('program_link')} className={inp} placeholder="https://..." />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-slate-600 mb-1">Short description (shown in WhatsApp message)</label>
-              <textarea value={form.description} onChange={set('description')} rows={2} className={`${inp} resize-none`} placeholder="e.g. 7 nights in Bali including hotel, tours, and airport transfers" />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-slate-600">Short description (shown in WhatsApp message)</label>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({
+                    ...f,
+                    description: `🌟 What's included:\n• {nights} nights accommodation at {hotel_type} hotel\n• {meals} meal plan\n• {tours_count} guided tours & day trips\n• Airport transfers (arrival & departure)\n• {extra}\n\n⚠️ Not included: International flights & visa fees`
+                  }))}
+                  className="text-xs text-teal-600 hover:text-teal-700 font-medium border border-teal-200 px-2 py-0.5 rounded"
+                >
+                  Use Template
+                </button>
+              </div>
+              <textarea
+                value={form.description}
+                onChange={set('description')}
+                rows={5}
+                className={`${inp} resize-none font-mono text-xs`}
+                placeholder={`Write a description or click "Use Template" above.\n\nReplace {placeholders} with real values, e.g.:\n• {nights} → 7\n• {hotel_type} → 5-star\n• {meals} → breakfast & dinner\n• {tours_count} → 4\n• {extra} → Uluwatu sunset temple visit`}
+              />
+              {form.description && form.description.includes('{') && (
+                <p className="text-xs text-amber-600 mt-1">⚠️ Fill in all <span className="font-mono">{'{placeholders}'}</span> before saving</p>
+              )}
+              {form.description && !form.description.includes('{') && (
+                <div className="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-600 whitespace-pre-wrap">
+                  <span className="text-slate-400 block mb-1 font-medium">Preview in WhatsApp:</span>
+                  {form.description}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2 justify-end">
