@@ -55,7 +55,7 @@ function buildGreetingMessage(lead: Lead): string {
   const name = lead.name.split(' ')[0]
   return `Ahlan ${name}! 🌺
 
-Mabrook on your upcoming wedding! I'm Ahmed from InterTeam Travel, Cairo's specialist in honeymoon packages.
+Mabrook on your upcoming wedding! I'm Ahmed from ITTravelers, Cairo's specialist in honeymoon packages.
 
 We work differently from other agencies — instead of offering fixed packages, *we help you build and customize your own honeymoon* based on your dream, your dates, and your budget. 🌍
 
