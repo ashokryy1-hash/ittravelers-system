@@ -21,6 +21,7 @@ import ReservationsScreen from './hms/screens/ReservationsScreen'
 import SettingsScreen from './hms/screens/SettingsScreen'
 import SalesPortalScreen from './hms/screens/SalesPortalScreen'
 import ToursScreen from './hms/screens/ToursScreen'
+import LeadsScreen from './hms/screens/LeadsScreen'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/hms" element={<HmsRoot />}>
               <Route element={<HmsLayout />}>
                 <Route index element={<DashboardScreen />} />
+                <Route path="leads" element={<LeadsScreen />} />
                 <Route path="discovery" element={<DiscoveryScreen />} />
                 <Route path="outreach" element={<OutreachScreen />} />
                 <Route path="rates" element={<RatesScreen />} />

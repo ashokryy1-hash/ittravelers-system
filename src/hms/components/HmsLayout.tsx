@@ -1,13 +1,14 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Search, GitMerge, Building2, CalendarCheck,
-  Settings, LayoutDashboard, LogOut, Menu, X, Map
+  Settings, LayoutDashboard, LogOut, Menu, X, Map, Users
 } from 'lucide-react'
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const NAV = [
   { to: '/hms', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/hms/leads', label: 'Leads', icon: Users },
   { to: '/hms/discovery', label: 'Discovery', icon: Search },
   { to: '/hms/outreach', label: 'Outreach', icon: GitMerge },
   { to: '/hms/rates', label: 'Rates', icon: Building2 },
