@@ -74,6 +74,15 @@ export default function SettingsScreen() {
         </Field>
       </Section>
 
+      <Section title="Leads — Meeting Links">
+        <Field label="Google Meet / Calendly link" description="Sent automatically when a lead chooses online meeting">
+          <input className={inp} value={(form as any).google_meet_link ?? ''} onChange={set('google_meet_link' as any)} placeholder="https://calendly.com/yourname" />
+        </Field>
+        <Field label="Office address" description="Sent automatically when a lead chooses office meeting">
+          <input className={inp} value={(form as any).office_address ?? ''} onChange={set('office_address' as any)} placeholder="e.g. 15 Tahrir St, Dokki, Cairo" />
+        </Field>
+      </Section>
+
       <Section title="Reminders">
         <Field label="Default follow-up reminder (days)" description="How many days after outreach to set a follow-up reminder">
           <input type="number" className={inp} value={form.followup_reminder_days} onChange={set('followup_reminder_days')} />

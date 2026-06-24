@@ -131,6 +131,9 @@ export interface HmsSettings {
   agency_signature: string
   google_places_api_key: string
   followup_reminder_days: string
+  google_meet_link: string
+  calendly_link: string
+  office_address: string
 }
 
 export type Season = 'low' | 'high' | 'peak'
