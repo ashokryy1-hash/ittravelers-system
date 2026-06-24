@@ -235,6 +235,28 @@ function LeadCard({ lead }: { lead: Lead }) {
     toast.success('Notes saved')
   }
 
+  const [sending, setSending] = useState(false)
+
+  async function sendAutoWhatsApp() {
+    setSending(true)
+    try {
+      const res = await fetch('/api/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: lead.phone, message: waMessage }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to send')
+      await supabase.from('hms_leads').update({ whatsapp_sent: true, whatsapp_sent_at: new Date().toISOString(), status: lead.status === 'New' ? 'Contacted' : lead.status }).eq('id', lead.id)
+      qc.invalidateQueries({ queryKey: ['hms_leads'] })
+      toast.success('WhatsApp sent automatically!')
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to send WhatsApp')
+    } finally {
+      setSending(false)
+    }
+  }
+
   async function markWhatsAppSent() {
     await supabase.from('hms_leads').update({ whatsapp_sent: true, whatsapp_sent_at: new Date().toISOString() }).eq('id', lead.id)
     qc.invalidateQueries({ queryKey: ['hms_leads'] })
@@ -293,15 +315,13 @@ function LeadCard({ lead }: { lead: Lead }) {
         <div className="flex items-center gap-2 shrink-0">
           {/* WhatsApp button */}
           {!lead.whatsapp_sent ? (
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noreferrer"
-              onClick={markWhatsAppSent}
-              className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+            <button
+              onClick={sendAutoWhatsApp}
+              disabled={sending}
+              className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
             >
-              <MessageCircle size={13} /> Send WhatsApp
-            </a>
+              <MessageCircle size={13} /> {sending ? 'Sending…' : 'Send WhatsApp'}
+            </button>
           ) : (
             <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-lg">
               <Check size={12} /> Sent
@@ -342,19 +362,26 @@ function LeadCard({ lead }: { lead: Lead }) {
             <pre className="text-xs bg-green-50 border border-green-100 rounded-lg p-3 whitespace-pre-wrap font-sans text-slate-700">
               {waMessage}
             </pre>
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2 items-center">
+              <button
+                onClick={sendAutoWhatsApp}
+                disabled={sending}
+                className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white text-xs px-3 py-1.5 rounded-lg"
+              >
+                <MessageCircle size={12} /> {sending ? 'Sending…' : '⚡ Send automatically'}
+              </button>
               <a
                 href={waLink}
                 target="_blank"
                 rel="noreferrer"
                 onClick={markWhatsAppSent}
-                className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg"
+                className="flex items-center gap-1.5 border border-green-400 text-green-700 text-xs px-3 py-1.5 rounded-lg hover:bg-green-50"
               >
-                <MessageCircle size={12} /> Open in WhatsApp
+                <MessageCircle size={12} /> Open in WhatsApp manually
               </a>
               {lead.whatsapp_sent && lead.whatsapp_sent_at && (
-                <span className="text-xs text-slate-400 self-center">
-                  Sent {format(parseISO(lead.whatsapp_sent_at), 'd MMM, HH:mm')}
+                <span className="text-xs text-slate-400">
+                  ✓ Sent {format(parseISO(lead.whatsapp_sent_at), 'd MMM, HH:mm')}
                 </span>
               )}
             </div>
