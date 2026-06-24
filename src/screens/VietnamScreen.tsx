@@ -115,7 +115,7 @@ export default function VietnamScreen() {
         {/* City Cards */}
         <div className="mb-6">
           <h2 className="font-display text-2xl text-terracotta-700 mb-4">Explore by City</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 auto-rows-fr">
             {(cities ?? []).map((city) => (
               <button
                 key={city.id}
