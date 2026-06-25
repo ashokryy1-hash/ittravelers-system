@@ -72,25 +72,27 @@ const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ou
 
 function buildGreetingMessage(lead: Lead): string {
   const name = lead.name.split(' ')[0]
-  return `Ahlan ${name}! 🌺
+  return `Hi ${name}! 👋😊
 
-Mabrook on your upcoming wedding! I'm Ahmed from ITTravelers, Cairo's specialist in honeymoon packages.
+Congratulations on your upcoming wedding! 🎉❤️
 
-We work differently from other agencies — instead of offering fixed packages, *we help you build and customize your own honeymoon* based on your dream, your dates, and your budget. 🌍
+Planning a honeymoon can honestly feel overwhelming... everyone recommends something different, Instagram makes everything look amazing, and it's hard to know what's actually worth it.
 
-Here's how it works:
-✅ You choose your destination (Bali, Thailand, Maldives...)
-✅ We guide you through every city & area
-✅ You pick the hotels, tours & experiences you love
-✅ We handle everything — flights, transfers, hotels, tours
+That's exactly why we only specialize in honeymoons. We don't believe in fixed packages — we design every trip from scratch around your budget, travel style, and everything you've been dreaming about.
 
-To get started, I'd love to show you what we can create for you.
+I've personally explored Bali and many of the destinations we recommend, so you'll be getting advice based on real experience — not just hotel brochures or online reviews. 😊
 
-Would you prefer to meet:
-🏢 At our Cairo office
-💻 Or a quick Google Meet call?
+Here's how our call works:
+🗺 We walk you through each destination — city by city
+🏨 You see the actual hotels and pick what feels right
+🌴 We go through the tours and experiences available
+💬 You ask anything, we answer from real experience
 
-Just let me know what works for you and I'll arrange it! 🙏`
+By the end of the call, you'll have a clear picture of exactly where you're going and what your honeymoon looks like — no pressure, no rush.
+
+The easiest way to start is with a quick chat — either at our Cairo office or on Google Meet. ✈️🌴
+
+Which would be easier for you?`
 }
 
 function buildGroupGreetingMessage(lead: Lead, trip: Trip | null): string {
