@@ -74,6 +74,8 @@ function buildGreetingMessage(lead: Lead): string {
   const name = lead.name.split(' ')[0]
   return `Hi ${name}! 👋😊
 
+This is Ahmed from ITTravelers.
+
 Congratulations on your upcoming wedding! 🎉❤️
 
 Planning a honeymoon can honestly feel overwhelming... everyone recommends something different, Instagram makes everything look amazing, and it's hard to know what's actually worth it.
@@ -104,6 +106,8 @@ function buildGroupGreetingMessage(lead: Lead, trip: Trip | null): string {
   const tripName = trip?.name ?? `${destination} Group Trip`
 
   return `Hi ${name}! 👋😊
+
+This is Ahmed from ITTravelers.
 
 I wanted to reach out personally about something exciting we have coming up — and I think it might be exactly what you're looking for! 🌴✈️
 
