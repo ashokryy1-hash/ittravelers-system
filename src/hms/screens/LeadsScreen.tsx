@@ -100,26 +100,29 @@ function buildGroupGreetingMessage(lead: Lead, trip: Trip | null): string {
   const depDate = trip?.departure_date ? format(parseISO(trip.departure_date), 'd MMM yyyy') : 'TBA'
   const retDate = trip?.return_date ? format(parseISO(trip.return_date), 'd MMM yyyy') : 'TBA'
   const price = trip?.price_per_person ? `${trip.price_per_person.toLocaleString()} ${trip.currency}` : 'TBA'
+  const destination = trip?.destination ?? lead.destination
+  const tripName = trip?.name ?? `${destination} Group Trip`
 
-  return `Ahlan ${name}! 🌴
+  return `Hi ${name}! 👋😊
 
-I'm Ahmed from ITTravelers — we have an amazing group trip coming up that I think you'd love!
+I wanted to reach out personally about something exciting we have coming up — and I think it might be exactly what you're looking for! 🌴✈️
 
-✈️ *${trip?.name ?? lead.destination + ' Group Trip'}*
-📍 Destination: ${trip?.destination ?? lead.destination}
+We're running a group trip to ${destination} and honestly, the itinerary for this one is really special. We've put together everything — hotels, tours, transfers — so you don't have to figure out a single thing. 😊
+
+Here's what's included:
+
+✈️ *${tripName}*
+📍 ${destination}
 🗓 Departure: ${depDate}
 🏠 Return: ${retDate}
-💰 Price: ${price} per person
-👥 Limited seats available!${trip?.description ? `\n\n${trip.description}` : ''}
+💰 ${price} per person — full program${trip?.description ? `\n\n${trip.description}` : ''}
 
 📋 Full program & details:
 ${trip?.program_link ?? '[Program link coming soon]'}
 
-Ready to join us? You have two options:
-✅ Reply *"I'm in"* and I'll reserve your seat right away
-📞 Or if you'd like to discuss the details first, I can arrange a quick call
+Seats are limited and we're already getting interest — so if this looks like something you'd want to be part of, just reply *"I'm in"* and I'll reserve your spot right away.
 
-Don't miss out — seats fill up fast! 🌟`
+Or if you'd like to know more before deciding, I'm happy to jump on a quick call and walk you through everything. No pressure at all. 🙏`
 }
 
 function buildGroupReminderMessage(lead: Lead, trip: Trip | null): string {
