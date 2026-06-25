@@ -31,6 +31,7 @@ interface Lead {
   assigned_to: string | null
   lead_type: 'honeymoon' | 'group'
   trip_id: string | null
+  priority: 'hot' | 'warm' | 'cold' | 'on_hold' | null
   created_at: string
   updated_at: string
 }
@@ -63,6 +64,13 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
   Booked: 'bg-green-100 text-green-700',
   Lost: 'bg-gray-100 text-gray-500',
 }
+
+const PRIORITIES = [
+  { value: 'hot',     label: '🔥 Hot',     bg: 'bg-red-100 text-red-700 border-red-200' },
+  { value: 'warm',    label: '🌱 Warm',    bg: 'bg-green-100 text-green-700 border-green-200' },
+  { value: 'cold',    label: '❄️ Cold',    bg: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { value: 'on_hold', label: '⏸ On Hold', bg: 'bg-gray-100 text-gray-500 border-gray-200' },
+] as const
 
 const SOURCES = ['Marketing', 'Instagram', 'Facebook', 'Referral', 'Website', 'WhatsApp', 'Walk-in', 'Other']
 const DESTINATIONS = ['Bali', 'Thailand', 'Vietnam', 'Maldives', 'Other']
@@ -656,6 +664,11 @@ function LeadCard({ lead, settings, trip }: { lead: Lead; settings: HmsSettings 
     qc.invalidateQueries({ queryKey: ['hms_leads'] })
   }
 
+  async function setPriority(priority: string | null) {
+    await supabase.from('hms_leads').update({ priority }).eq('id', lead.id)
+    qc.invalidateQueries({ queryKey: ['hms_leads'] })
+  }
+
   async function saveNotes() {
     await supabase.from('hms_leads').update({ notes }).eq('id', lead.id)
     qc.invalidateQueries({ queryKey: ['hms_leads'] })
@@ -733,6 +746,7 @@ function LeadCard({ lead, settings, trip }: { lead: Lead; settings: HmsSettings 
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-slate-800">{lead.name}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[lead.status]}`}>{lead.status}</span>
+            {lead.priority && (() => { const p = PRIORITIES.find(p => p.value === lead.priority); return p ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${p.bg}`}>{p.label}</span> : null })()}
             {isGroup && trip && <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">🌴 {trip.name}</span>}
             {lead.status === 'New' && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium animate-pulse">Not contacted</span>}
             {needsFollowUp && <span className="flex items-center gap-1 text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium animate-pulse"><Bell size={10} /> Follow up needed</span>}
@@ -773,6 +787,19 @@ function LeadCard({ lead, settings, trip }: { lead: Lead; settings: HmsSettings 
                 <button key={s} onClick={() => setStatus(s)}
                   className={`text-xs px-3 py-1 rounded-full border transition-colors ${lead.status === s ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-300 text-slate-600 hover:bg-gray-50'}`}>
                   {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Priority */}
+          <div>
+            <div className="text-xs font-medium text-slate-500 mb-2">Priority:</div>
+            <div className="flex flex-wrap gap-1.5">
+              {PRIORITIES.map(p => (
+                <button key={p.value} onClick={() => setPriority(lead.priority === p.value ? null : p.value)}
+                  className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${lead.priority === p.value ? p.bg : 'border-gray-200 text-slate-500 hover:bg-gray-50'}`}>
+                  {p.label}
                 </button>
               ))}
             </div>
