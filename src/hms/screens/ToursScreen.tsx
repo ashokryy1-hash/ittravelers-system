@@ -684,22 +684,13 @@ const CATEGORY_PHOTOS: Record<string, string> = {
 
 const ALL_CATEGORIES = ['All', 'Romantic', 'Adventure', 'Cultural', 'Nature', 'Water', 'Nightlife', 'Beach Club']
 
-function ExplorerToursTab() {
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('All')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-
-  const { data: tours = [], isLoading } = useQuery<ExplorerTourWithCities[]>({
+function useExplorerTours() {
+  return useQuery<ExplorerTourWithCities[]>({
     queryKey: ['explorer_tours_hms'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('explorer_tours')
-        .select(`
-          *,
-          tour_cities(
-            cities(name, destinations(name))
-          )
-        `)
+        .select(`*, tour_cities(cities(name, destinations(name)))`)
         .order('sort_order')
       if (error) throw error
       return (data ?? []).map((t: any) => ({
@@ -711,64 +702,70 @@ function ExplorerToursTab() {
       }))
     },
   })
+}
+
+function ExplorerToursTab() {
+  const [city, setCity] = useState('All')
+  const [category, setCategory] = useState('All')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const { data: tours = [], isLoading } = useExplorerTours()
+
+  // Derive unique cities from data
+  const allCities = useMemo(() => {
+    const set = new Set<string>()
+    tours.forEach(t => t.cities.forEach(c => set.add(c.name)))
+    return ['All', ...Array.from(set).sort()]
+  }, [tours])
 
   const filtered = tours.filter(t => {
+    const matchCity = city === 'All' || t.cities.some(c => c.name === city)
     const matchCat = category === 'All' || t.category === category
-    const matchSearch = !search.trim() || t.name.toLowerCase().includes(search.toLowerCase())
-    return matchCat && matchSearch
+    return matchCity && matchCat
   })
-
-  // Group by destination
-  const grouped = filtered.reduce<Record<string, ExplorerTourWithCities[]>>((acc, t) => {
-    const dest = t.cities[0]?.destination || 'Other'
-    if (!acc[dest]) acc[dest] = []
-    acc[dest].push(t)
-    return acc
-  }, {})
 
   if (isLoading) return <p className="text-sm text-slate-400">Loading tours…</p>
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search tours…"
-            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400"
-          />
-        </div>
-        {/* Category filter */}
-        <div className="flex flex-wrap gap-1.5">
-          {ALL_CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                category === cat
-                  ? 'bg-terracotta-600 text-white border-terracotta-600'
-                  : 'bg-white text-slate-500 border-gray-300 hover:border-terracotta-400'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+      {/* City tabs */}
+      <div className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto pb-px">
+        {allCities.map(c => (
+          <button
+            key={c}
+            onClick={() => { setCity(c); setCategory('All') }}
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
+              city === c ? 'border-terracotta-500 text-terracotta-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      {/* Category filter */}
+      <div className="flex flex-wrap gap-1.5 mb-5">
+        {ALL_CATEGORIES.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setCategory(cat)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              category === cat
+                ? 'bg-terracotta-600 text-white border-terracotta-600'
+                : 'bg-white text-slate-500 border-gray-300 hover:border-terracotta-400'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
       </div>
 
       {filtered.length === 0 && (
         <p className="text-sm text-slate-400 text-center py-10">No tours match your filter.</p>
       )}
 
-      <div className="space-y-8">
-        {Object.entries(grouped).map(([destination, destTours]) => (
-          <div key={destination}>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{destination}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {destTours.map(tour => {
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filtered.map(tour => {
                 const expanded = expandedId === tour.id
                 const photo = tour.cover_image_url || CATEGORY_PHOTOS[tour.category]
                 const tiktokLinks = [tour.tiktok_1, tour.tiktok_2, tour.tiktok_3, tour.tiktok_4].filter(Boolean)
@@ -864,10 +861,98 @@ function ExplorerToursTab() {
                     </div>
                   </div>
                 )
-              })}
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Day Library Picker (Templates + Explorer Tours) ──────────────────────────
+
+function DayLibraryPicker({
+  templates,
+  onApplyTemplate,
+  onAddTour,
+}: {
+  templates: ActivityTemplate[]
+  onApplyTemplate: (t: ActivityTemplate) => void
+  onAddTour: (name: string) => void
+}) {
+  const [pickerTab, setPickerTab] = useState<'templates' | 'tours'>('templates')
+  const [tourCity, setTourCity] = useState('All')
+  const { data: explorerTours = [] } = useExplorerTours()
+
+  const allCities = useMemo(() => {
+    const set = new Set<string>()
+    explorerTours.forEach(t => t.cities.forEach(c => set.add(c.name)))
+    return ['All', ...Array.from(set).sort()]
+  }, [explorerTours])
+
+  const visibleTours = tourCity === 'All'
+    ? explorerTours
+    : explorerTours.filter(t => t.cities.some(c => c.name === tourCity))
+
+  return (
+    <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+      {/* Picker sub-tabs */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setPickerTab('templates')}
+          className={`flex-1 flex items-center justify-center gap-1.5 text-xs px-3 py-2 font-medium transition-colors ${
+            pickerTab === 'templates' ? 'bg-white text-terracotta-600 border-b-2 border-terracotta-500 -mb-px' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <BookOpen size={12} /> Templates
+        </button>
+        <button
+          onClick={() => setPickerTab('tours')}
+          className={`flex-1 flex items-center justify-center gap-1.5 text-xs px-3 py-2 font-medium transition-colors ${
+            pickerTab === 'tours' ? 'bg-white text-terracotta-600 border-b-2 border-terracotta-500 -mb-px' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Globe size={12} /> Explorer Tours
+        </button>
+      </div>
+
+      <div className="p-2 max-h-64 overflow-y-auto space-y-1">
+        {pickerTab === 'templates' && (
+          <>
+            {templates.map(t => (
+              <button key={t.id} onClick={() => onApplyTemplate(t)}
+                className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-700">
+                {t.icon} {t.name} <span className="text-xs text-slate-400 ml-1">({t.activities.length} stops)</span>
+              </button>
+            ))}
+            {!templates.length && <div className="text-xs text-slate-400 px-2 py-1">No templates yet</div>}
+          </>
+        )}
+
+        {pickerTab === 'tours' && (
+          <>
+            {/* City tabs */}
+            <div className="flex gap-1 flex-wrap pb-1 mb-1 border-b border-gray-200">
+              {allCities.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setTourCity(c)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    tourCity === c ? 'bg-terracotta-600 text-white border-terracotta-600' : 'bg-white text-slate-500 border-gray-200 hover:border-terracotta-400'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
             </div>
-          </div>
-        ))}
+            {visibleTours.map(t => (
+              <button key={t.id} onClick={() => onAddTour(t.name)}
+                className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-700 flex items-center justify-between">
+                <span>{t.name}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full border ${CATEGORY_COLORS[t.category] ?? ''}`}>{t.category}</span>
+              </button>
+            ))}
+            {!visibleTours.length && <div className="text-xs text-slate-400 px-2 py-1">No tours for this city</div>}
+          </>
+        )}
       </div>
     </div>
   )
@@ -982,6 +1067,13 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
   function applyTemplate(dayIdx: number, template: ActivityTemplate) {
     setDays(d => d.map((day, j) => j !== dayIdx ? day : {
       ...day, activities: template.activities.map(a => ({ ...a, type: 'stop' as const })),
+    }))
+    setShowLibrary(null)
+  }
+
+  function addExplorerTour(dayIdx: number, tourName: string) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: [...day.activities, { time: '', description: tourName, type: 'stop' as const }],
     }))
     setShowLibrary(null)
   }
@@ -1114,16 +1206,11 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
               </div>
 
               {showLibrary === dayIdx && (
-                <div className="bg-gray-50 rounded-lg p-2 space-y-1 border border-gray-200">
-                  <div className="text-xs text-slate-500 px-1 mb-1">Pick a template</div>
-                  {templates.map(t => (
-                    <button key={t.id} onClick={() => applyTemplate(dayIdx, t)}
-                      className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-700">
-                      {t.icon} {t.name} <span className="text-xs text-slate-400 ml-2">({t.activities.length} stops)</span>
-                    </button>
-                  ))}
-                  {!templates.length && <div className="text-xs text-slate-400 px-2">No templates yet</div>}
-                </div>
+                <DayLibraryPicker
+                  templates={templates}
+                  onApplyTemplate={t => applyTemplate(dayIdx, t)}
+                  onAddTour={name => addExplorerTour(dayIdx, name)}
+                />
               )}
 
               <div className="space-y-3">
@@ -1407,6 +1494,13 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
     setShowLibrary(null)
   }
 
+  function addExplorerTour(dayIdx: number, tourName: string) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: [...day.activities, { time: '', description: tourName, type: 'stop' as const }],
+    }))
+    setShowLibrary(null)
+  }
+
   async function save() {
     if (!clientName.trim()) return toast.error('Client name required')
     setSaving(true)
@@ -1609,20 +1703,11 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
                   </div>
 
                   {showLibrary === dayIdx && (
-                    <div className="bg-gray-50 rounded-lg p-2 space-y-1 border border-gray-200">
-                      <div className="text-xs text-slate-500 px-1 mb-1">Pick a template</div>
-                      {templates.map(t => (
-                        <button
-                          key={t.id}
-                          onClick={() => applyTemplate(dayIdx, t)}
-                          className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-slate-700"
-                        >
-                          {t.icon} {t.name}
-                          <span className="text-xs text-slate-400 ml-2">({t.activities.length} stops)</span>
-                        </button>
-                      ))}
-                      {!templates.length && <div className="text-xs text-slate-400 px-2">No templates yet</div>}
-                    </div>
+                    <DayLibraryPicker
+                      templates={templates}
+                      onApplyTemplate={t => applyTemplate(dayIdx, t)}
+                      onAddTour={name => addExplorerTour(dayIdx, name)}
+                    />
                   )}
 
                   <div className="space-y-3">
