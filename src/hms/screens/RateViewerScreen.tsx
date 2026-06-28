@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Copy, ChevronLeft, Sparkles, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Copy, ChevronLeft, ChevronRight, Sparkles, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { HmsHotel, HmsRoomType, HmsSurchargeRule, RateQuoteResult } from '../types'
 import { getSeasonForStay, getSurcharge, seasonLabel, nightsBetween } from '../lib/season'
@@ -21,6 +21,52 @@ interface SessionQuoteRow {
   matched: boolean
   result?: RateQuoteResult
   noRoom?: boolean
+  suggestions?: HmsHotel[]  // fuzzy candidates when no confident match
+}
+
+// ─── Fuzzy hotel name matching ────────────────────────────────────────────────
+
+const STOP_WORDS = new Set([
+  'the', 'a', 'an', 'and', 'by', 'at', 'in', 'of', 'de',
+  'hotel', 'resort', 'villa', 'villas', 'boutique', 'luxury',
+  'beach', 'spa', 'club', 'estate', 'retreat',
+  'bali', 'ubud', 'canggu', 'seminyak', 'nusa', 'dua', 'sanur',
+  'jimbaran', 'kuta', 'legian', 'uluwatu', 'lombok',
+  'phuket', 'koh', 'samui', 'krabi', 'chiang', 'mai', 'bangkok',
+  'hanoi', 'hoi', 'an', 'hcmc', 'saigon', 'danang',
+])
+
+function tokenize(name: string): Set<string> {
+  return new Set(
+    name.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 1 && !STOP_WORDS.has(w))
+  )
+}
+
+function hotelMatchScore(a: string, b: string): number {
+  const tokA = tokenize(a)
+  const tokB = tokenize(b)
+  if (!tokA.size || !tokB.size) return 0
+  let intersection = 0
+  for (const t of tokA) if (tokB.has(t)) intersection++
+  // Jaccard similarity weighted toward shorter name (avoid false negatives)
+  const union = tokA.size + tokB.size - intersection
+  const jaccard = intersection / union
+  // Bonus if one name starts with the other's first token
+  const firstA = [...tokA][0] ?? ''
+  const firstB = [...tokB][0] ?? ''
+  const prefixBonus = (firstA && firstB && (firstA === firstB)) ? 0.15 : 0
+  return Math.min(1, jaccard + prefixBonus)
+}
+
+function findBestHotelMatches(name: string, allHotels: HmsHotel[]): { hotel: HmsHotel; score: number }[] {
+  return allHotels
+    .map(h => ({ hotel: h, score: hotelMatchScore(name, h.name) }))
+    .filter(x => x.score > 0.25)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4)
 }
 
 export default function RateViewerScreen() {
@@ -33,6 +79,7 @@ export default function RateViewerScreen() {
   const [searching, setSearching] = useState(false)
   const [sessionRows, setSessionRows] = useState<SessionQuoteRow[] | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
+  const [sessionRates, setSessionRates] = useState({ idrToEgp: 0, thbToEgp: 0, usdToEgp: 0 })
 
   const { data: hotels } = useQuery<HmsHotel[]>({
     queryKey: ['hms_hotels_quote'],
@@ -84,6 +131,9 @@ export default function RateViewerScreen() {
     setResults(null)
     const settings = await getSettings()
     const idrToEgp = parseFloat(settings.IDR_to_EGP)
+    const thbToEgp = parseFloat(settings.THB_to_EGP)
+    const usdToEgp = parseFloat(settings.USD_to_EGP)
+    setSessionRates({ idrToEgp, thbToEgp, usdToEgp })
     const allHotels = hotels ?? []
     const allRooms = rooms ?? []
     const allRules = surchargeRules ?? []
@@ -92,8 +142,13 @@ export default function RateViewerScreen() {
       const nights = nightsBetween(item.checkIn, item.checkOut)
       if (nights <= 0) return { item, matched: false }
 
-      const hotel = allHotels.find(h => h.name.toLowerCase() === item.name.toLowerCase())
-      if (!hotel) return { item, matched: false }
+      const candidates = findBestHotelMatches(item.name, allHotels)
+      if (!candidates.length) return { item, matched: false }
+      // Auto-match if top candidate is confident (score ≥ 0.5), else show suggestions
+      if (candidates[0].score < 0.5) {
+        return { item, matched: false, suggestions: candidates.map(c => c.hotel) }
+      }
+      const hotel = candidates[0].hotel
 
       const hotelRooms = allRooms.filter(r => r.hotel_id === hotel.id)
       const destRules = allRules.filter(r => (r as any).hms_destinations?.name === (hotel as any).hms_destinations?.name)
@@ -118,8 +173,8 @@ export default function RateViewerScreen() {
       const totalStay = totalPerNight * nights
       let totalEgp = 0
       if (room.currency === 'IDR') totalEgp = totalStay * idrToEgp
-      else if (room.currency === 'THB') totalEgp = totalStay * parseFloat(settings.THB_to_EGP)
-      else totalEgp = totalStay * parseFloat(settings.USD_to_EGP)
+      else if (room.currency === 'THB') totalEgp = totalStay * thbToEgp
+      else totalEgp = totalStay * usdToEgp
 
       return {
         item,
@@ -214,7 +269,16 @@ export default function RateViewerScreen() {
             <>
               <div className="space-y-3">
                 {sessionRows.map((row, i) => (
-                  <SessionQuoteRow key={i} row={row} />
+                  <SessionQuoteRow
+                    key={i}
+                    row={row}
+                    rooms={rooms ?? []}
+                    surchargeRules={surchargeRules ?? []}
+                    idrToEgp={sessionRates.idrToEgp}
+                    thbToEgp={sessionRates.thbToEgp}
+                    usdToEgp={sessionRates.usdToEgp}
+                    onResolved={updated => setSessionRows(prev => prev ? prev.map((r, j) => j === i ? updated : r) : prev)}
+                  />
                 ))}
               </div>
               {(() => {
@@ -300,9 +364,73 @@ export default function RateViewerScreen() {
   )
 }
 
-function SessionQuoteRow({ row }: { row: SessionQuoteRow }) {
-  const { item, matched, result, noRoom } = row
+function SessionQuoteRow({
+  row,
+  rooms,
+  surchargeRules,
+  idrToEgp,
+  thbToEgp,
+  usdToEgp,
+  onResolved,
+}: {
+  row: SessionQuoteRow
+  rooms: HmsRoomType[]
+  surchargeRules: HmsSurchargeRule[]
+  idrToEgp: number
+  thbToEgp: number
+  usdToEgp: number
+  onResolved: (updated: SessionQuoteRow) => void
+}) {
+  const { item, matched, result, noRoom, suggestions } = row
   const [open, setOpen] = useState(false)
+
+  // Suggestions mode: low-confidence fuzzy matches
+  if (!matched && suggestions && suggestions.length > 0) {
+    return (
+      <div className="bg-white rounded-lg border border-amber-200 overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-amber-100">
+          <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+          <span className="text-sm text-slate-700 font-medium">{item.name}</span>
+          <span className="text-xs text-amber-600 ml-auto">Did you mean one of these?</span>
+        </div>
+        <div className="divide-y divide-amber-50">
+          {suggestions.map(h => (
+            <button
+              key={h.id}
+              onClick={() => {
+                const hotelRooms = rooms.filter(r => r.hotel_id === h.id)
+                const destRules = surchargeRules.filter(r => (r as any).hms_destinations?.name === (h as any).hms_destinations?.name)
+                const { season, rule } = getSeasonForStay(item.checkIn, item.checkOut, destRules)
+                let room = hotelRooms.find(r => r.name.toLowerCase() === item.roomType.toLowerCase())
+                if (!room && item.roomType) room = hotelRooms.find(r => r.name.toLowerCase().includes(item.roomType.toLowerCase()))
+                if (!room) room = hotelRooms[0]
+                if (!room) { onResolved({ item, matched: true, noRoom: true }); return }
+                let baseRate = 0
+                if (season === 'peak') baseRate = room.peak_season_rate ?? room.high_season_rate ?? room.low_season_rate ?? 0
+                else if (season === 'high') baseRate = room.high_season_rate ?? room.low_season_rate ?? 0
+                else baseRate = room.low_season_rate ?? 0
+                if (!baseRate) { onResolved({ item, matched: true, noRoom: true }); return }
+                const nights = nightsBetween(item.checkIn, item.checkOut)
+                const surcharge = getSurcharge(season, rule, room.room_category as 'room' | 'villa', h.surcharge_waiver)
+                const totalPerNight = baseRate + surcharge
+                const totalStay = totalPerNight * nights
+                let totalEgp = 0
+                if (room.currency === 'IDR') totalEgp = totalStay * idrToEgp
+                else if (room.currency === 'THB') totalEgp = totalStay * thbToEgp
+                else totalEgp = totalStay * usdToEgp
+                onResolved({ item, matched: true, result: { hotel: h, roomType: room, season, baseRate, surcharge, totalPerNight, totalStay, totalEgp, nights } })
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-amber-50 transition-colors"
+            >
+              <div className="flex-1 text-sm text-slate-700">{h.name}</div>
+              <div className="text-xs text-slate-400">{h.city}</div>
+              <ChevronRight size={13} className="text-amber-400 shrink-0" />
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   if (!matched) {
     return (
@@ -334,6 +462,9 @@ function SessionQuoteRow({ row }: { row: SessionQuoteRow }) {
       >
         <div className="flex-1 min-w-0">
           <span className="font-medium text-slate-800 text-sm">{hotel.name}</span>
+          {hotel.name.toLowerCase() !== item.name.toLowerCase() && (
+            <span className="text-xs text-slate-400 ml-1 italic">(from "{item.name}")</span>
+          )}
           <span className="text-xs text-slate-400 ml-2">{item.cityName} · {nights}n · {item.checkIn} → {item.checkOut}</span>
         </div>
         <div className="text-right shrink-0">
