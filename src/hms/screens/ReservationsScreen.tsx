@@ -820,20 +820,27 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
       : form.currency === 'THB' ? totalIdr * parseFloat(settings.THB_to_EGP)
       : totalIdr * parseFloat(settings.USD_to_EGP)
 
-    const payload = hotelMode === 'manual'
-      ? { ...form, hotel_id: null, room_type_id: null, notes: `Hotel: ${form.manual_hotel_name}${form.manual_room_type ? ` | Room: ${form.manual_room_type}` : ''}${form.notes ? `\n${form.notes}` : ''}` }
-      : { ...form }
+    const notesValue = hotelMode === 'manual'
+      ? `Hotel: ${form.manual_hotel_name}${form.manual_room_type ? ` | Room: ${form.manual_room_type}` : ''}${form.notes ? `\n${form.notes}` : ''}`
+      : form.notes
 
-    await supabase.from('hms_bookings').insert({
-      ...payload,
-      manual_hotel_name: hotelMode === 'manual' ? form.manual_hotel_name : null,
-      manual_room_type: hotelMode === 'manual' ? form.manual_room_type : null,
+    const { error } = await supabase.from('hms_bookings').insert({
+      client_name: form.client_name.trim(),
+      hotel_id: hotelMode === 'contract' ? (form.hotel_id || null) : null,
+      room_type_id: hotelMode === 'contract' ? (form.room_type_id || null) : null,
+      checkin_date: form.checkin_date,
+      checkout_date: form.checkout_date,
+      meal_plan: form.meal_plan || null,
       rate_per_night: rate,
+      currency: form.currency,
+      notes: notesValue || null,
+      status: form.status,
       nights,
       total_price_idr: totalIdr,
       total_price_egp: Math.round(totalEgp),
     })
     setSaving(false)
+    if (error) { toast.error(error.message); return }
     onSaved()
     toast.success('Booking created')
   }
