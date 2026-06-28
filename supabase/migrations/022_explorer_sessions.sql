@@ -10,6 +10,16 @@ create table if not exists explorer_sessions (
   updated_at  timestamptz not null default now()
 );
 
+-- Enable RLS — only authenticated (logged-in) users can access sessions
+alter table explorer_sessions enable row level security;
+
+create policy "Authenticated users can manage sessions"
+  on explorer_sessions
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
 -- Index for searching by client name
 create index if not exists explorer_sessions_client_name_idx
   on explorer_sessions (lower(client_name));
