@@ -1,12 +1,27 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Copy, ChevronLeft } from 'lucide-react'
+import { Copy, ChevronLeft, Sparkles, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { HmsHotel, HmsRoomType, HmsSurchargeRule, RateQuoteResult } from '../types'
 import { getSeasonForStay, getSurcharge, seasonLabel, nightsBetween } from '../lib/season'
 import { getSettings } from '../lib/settings'
 import toast from 'react-hot-toast'
+
+interface SessionHotelItem {
+  name: string
+  cityName: string
+  checkIn: string
+  checkOut: string
+  roomType: string
+}
+
+interface SessionQuoteRow {
+  item: SessionHotelItem
+  matched: boolean
+  result?: RateQuoteResult
+  noRoom?: boolean
+}
 
 export default function RateViewerScreen() {
   const [destination, setDestination] = useState('Bali')
@@ -16,6 +31,8 @@ export default function RateViewerScreen() {
   const [maxBudget, setMaxBudget] = useState('')
   const [results, setResults] = useState<RateQuoteResult[] | null>(null)
   const [searching, setSearching] = useState(false)
+  const [sessionRows, setSessionRows] = useState<SessionQuoteRow[] | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(false)
 
   const { data: hotels } = useQuery<HmsHotel[]>({
     queryKey: ['hms_hotels_quote'],
@@ -40,6 +57,80 @@ export default function RateViewerScreen() {
       return data ?? []
     },
   })
+
+  // Unique cities for the selected destination
+  const cities = useMemo(() => {
+    const destHotels = (hotels ?? []).filter(h => (h as any).hms_destinations?.name === destination)
+    return Array.from(new Set(destHotels.map(h => h.city).filter(Boolean))).sort() as string[]
+  }, [hotels, destination])
+
+  // Reset area when destination changes
+  useEffect(() => { setArea('') }, [destination])
+
+  // Load session quote from localStorage on mount
+  useEffect(() => {
+    const raw = localStorage.getItem('trip_explorer_quote')
+    if (!raw) return
+    localStorage.removeItem('trip_explorer_quote')
+    let items: SessionHotelItem[]
+    try { items = JSON.parse(raw) } catch { return }
+    if (!items.length) return
+    runSessionQuote(items)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function runSessionQuote(items: SessionHotelItem[]) {
+    setSessionLoading(true)
+    setResults(null)
+    const settings = await getSettings()
+    const idrToEgp = parseFloat(settings.IDR_to_EGP)
+    const allHotels = hotels ?? []
+    const allRooms = rooms ?? []
+    const allRules = surchargeRules ?? []
+
+    const rows: SessionQuoteRow[] = await Promise.all(items.map(async item => {
+      const nights = nightsBetween(item.checkIn, item.checkOut)
+      if (nights <= 0) return { item, matched: false }
+
+      const hotel = allHotels.find(h => h.name.toLowerCase() === item.name.toLowerCase())
+      if (!hotel) return { item, matched: false }
+
+      const hotelRooms = allRooms.filter(r => r.hotel_id === hotel.id)
+      const destRules = allRules.filter(r => (r as any).hms_destinations?.name === (hotel as any).hms_destinations?.name)
+      const { season, rule } = getSeasonForStay(item.checkIn, item.checkOut, destRules)
+
+      // Try to match room type by name (partial match)
+      let room = hotelRooms.find(r => r.name.toLowerCase() === item.roomType.toLowerCase())
+      if (!room && item.roomType) room = hotelRooms.find(r => r.name.toLowerCase().includes(item.roomType.toLowerCase()))
+      if (!room) room = hotelRooms[0] // fallback: first room
+
+      if (!room) return { item, matched: true, noRoom: true }
+
+      let baseRate = 0
+      if (season === 'peak') baseRate = room.peak_season_rate ?? room.high_season_rate ?? room.low_season_rate ?? 0
+      else if (season === 'high') baseRate = room.high_season_rate ?? room.low_season_rate ?? 0
+      else baseRate = room.low_season_rate ?? 0
+
+      if (!baseRate) return { item, matched: true, noRoom: true }
+
+      const surcharge = getSurcharge(season, rule, room.room_category as 'room' | 'villa', hotel.surcharge_waiver)
+      const totalPerNight = baseRate + surcharge
+      const totalStay = totalPerNight * nights
+      let totalEgp = 0
+      if (room.currency === 'IDR') totalEgp = totalStay * idrToEgp
+      else if (room.currency === 'THB') totalEgp = totalStay * parseFloat(settings.THB_to_EGP)
+      else totalEgp = totalStay * parseFloat(settings.USD_to_EGP)
+
+      return {
+        item,
+        matched: true,
+        result: { hotel, roomType: room, season, baseRate, surcharge, totalPerNight, totalStay, totalEgp, nights },
+      }
+    }))
+
+    setSessionRows(rows)
+    setSessionLoading(false)
+  }
 
   async function search() {
     if (!checkin || !checkout) { toast.error('Enter check-in and check-out dates'); return }
@@ -105,6 +196,47 @@ export default function RateViewerScreen() {
         <h1 className="text-2xl font-bold text-slate-800">Rate Viewer & Quote Tool</h1>
       </div>
 
+      {/* Session quote panel */}
+      {(sessionLoading || sessionRows) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={16} className="text-amber-500" />
+            <span className="font-semibold text-amber-800">Quote from Trip Explorer</span>
+            <button
+              onClick={() => setSessionRows(null)}
+              className="ml-auto text-xs text-amber-600 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+          {sessionLoading && <div className="text-sm text-amber-600">Matching hotels with contracts…</div>}
+          {sessionRows && (
+            <>
+              <div className="space-y-3">
+                {sessionRows.map((row, i) => (
+                  <SessionQuoteRow key={i} row={row} />
+                ))}
+              </div>
+              {(() => {
+                const totalEgp = sessionRows.reduce((sum, r) => sum + (r.result?.totalEgp ?? 0), 0)
+                const matched = sessionRows.filter(r => r.result).length
+                const total = sessionRows.length
+                return (
+                  <div className="mt-4 pt-4 border-t border-amber-200 flex items-center justify-between">
+                    <span className="text-sm text-amber-700">{matched}/{total} hotels matched</span>
+                    {totalEgp > 0 && (
+                      <span className="font-bold text-lg text-amber-800">
+                        Total: EGP {Math.round(totalEgp).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Search form */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6">
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -117,8 +249,11 @@ export default function RateViewerScreen() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Area (optional)</label>
-            <input className={inp} placeholder="e.g. Ubud" value={area} onChange={e => setArea(e.target.value)} />
+            <label className="block text-xs font-medium text-gray-600 mb-1">City (optional)</label>
+            <select className={inp} value={area} onChange={e => setArea(e.target.value)}>
+              <option value="">All cities</option>
+              {cities.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Max budget EGP (optional)</label>
@@ -159,6 +294,64 @@ export default function RateViewerScreen() {
               <QuoteCard key={i} result={r} checkin={checkin} checkout={checkout} />
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SessionQuoteRow({ row }: { row: SessionQuoteRow }) {
+  const { item, matched, result, noRoom } = row
+  const [open, setOpen] = useState(false)
+
+  if (!matched) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-red-200">
+        <AlertTriangle size={14} className="text-red-400 shrink-0" />
+        <span className="text-sm text-slate-700 font-medium">{item.name}</span>
+        <span className="text-xs text-red-500 ml-auto">No contract found — add to HMS hotels</span>
+      </div>
+    )
+  }
+
+  if (noRoom || !result) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-amber-200">
+        <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+        <span className="text-sm text-slate-700 font-medium">{item.name}</span>
+        <span className="text-xs text-amber-600 ml-auto">Hotel found but no matching room / no rate</span>
+      </div>
+    )
+  }
+
+  const { hotel, roomType, season, baseRate, surcharge, totalPerNight, totalStay, totalEgp, nights } = result
+
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex-1 min-w-0">
+          <span className="font-medium text-slate-800 text-sm">{hotel.name}</span>
+          <span className="text-xs text-slate-400 ml-2">{item.cityName} · {nights}n · {item.checkIn} → {item.checkOut}</span>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-sm font-bold text-terracotta-700">EGP {Math.round(totalEgp).toLocaleString()}</div>
+          <div className="text-xs text-slate-400">{roomType.currency} {totalStay.toLocaleString()} total</div>
+        </div>
+        {open ? <ChevronUp size={14} className="text-slate-400 shrink-0" /> : <ChevronDown size={14} className="text-slate-400 shrink-0" />}
+      </button>
+      {open && (
+        <div className="border-t border-slate-100 px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <Metric label="Room" value={roomType.name} />
+          <Metric label="Meal plan" value={roomType.meal_plan} />
+          <Metric label="Season" value={seasonLabel(season)} />
+          <Metric label="Room type" value={item.roomType || roomType.name} />
+          <Metric label="Base rate/night" value={`${roomType.currency} ${baseRate.toLocaleString()}`} />
+          <Metric label="Surcharge/night" value={surcharge > 0 ? `${roomType.currency} ${surcharge.toLocaleString()}` : 'None'} />
+          <Metric label="Total/night" value={`${roomType.currency} ${totalPerNight.toLocaleString()}`} highlight />
+          <Metric label={`Total (${nights} nights)`} value={`EGP ${Math.round(totalEgp).toLocaleString()}`} highlight />
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Copy, Trash2, User, Calendar } from 'lucide-react'
+import { ArrowLeft, Copy, Trash2, User, Calendar, Calculator } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useSession } from '../context/SessionContext'
 import { useBasePath } from '../context/TripExplorerContext'
@@ -75,6 +75,21 @@ export default function SummaryScreen() {
     }
   }
 
+  const hotelSelections = selections.filter(s => s.type === 'hotel')
+  const isHmsContext = basePath === '/hms/trip-explorer'
+
+  const handleGetQuote = () => {
+    const quoteData = hotelSelections.map(s => ({
+      name: s.name,
+      cityName: s.cityName,
+      checkIn: hotelDates[s.id]?.checkIn ?? '',
+      checkOut: hotelDates[s.id]?.checkOut ?? '',
+      roomType: hotelDates[s.id]?.roomType ?? '',
+    }))
+    localStorage.setItem('trip_explorer_quote', JSON.stringify(quoteData))
+    navigate('/hms/rates/quote')
+  }
+
   return (
     <div className="min-h-screen bg-ivory-100">
       {/* Header */}
@@ -122,7 +137,7 @@ export default function SummaryScreen() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex gap-3 mb-8">
+            <div className="flex flex-wrap gap-3 mb-8">
               <button
                 onClick={handleCopy}
                 className="flex items-center gap-2 px-5 py-2.5 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-full font-body text-sm font-medium transition-colors shadow"
@@ -130,6 +145,15 @@ export default function SummaryScreen() {
                 <Copy size={15} />
                 Copy Summary
               </button>
+              {isHmsContext && hotelSelections.length > 0 && (
+                <button
+                  onClick={handleGetQuote}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-body text-sm font-medium transition-colors shadow"
+                >
+                  <Calculator size={15} />
+                  Get Quote
+                </button>
+              )}
               <button
                 onClick={handleClear}
                 className="flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 border border-red-200 rounded-full font-body text-sm font-medium transition-colors"
