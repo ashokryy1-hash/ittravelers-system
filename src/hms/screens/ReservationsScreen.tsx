@@ -39,6 +39,35 @@ function buildEmailTemplate(type: 'availability' | 'confirm' | 'payment' | 'canc
   const seasonNote = season !== 'Low' ? ` (${season} Season)` : ''
 
   if (type === 'availability') {
+    const isManual = !hotel // no contract hotel linked
+    if (isManual) {
+      return {
+        to: toEmail,
+        subject: `Availability & Rate Inquiry — ${checkin} to ${checkout} | ${hotelName}`,
+        body: `Dear Reservations Team,
+
+I hope this message finds you well.
+
+I am writing on behalf of ITTravelers, a Cairo-based honeymoon travel agency. We are looking to arrange a stay for one of our honeymoon couples at your property and would like to kindly inquire about the following:
+
+• Hotel: ${hotelName}
+• Room Type: ${roomName || 'Best available room for a honeymoon couple'}
+• Check-in: ${checkin}
+• Check-out: ${checkout}
+• Duration: ${nights} night${nights !== 1 ? 's' : ''}
+• Guests: Honeymoon couple (2 adults)
+
+Could you please provide us with:
+1. Availability confirmation for the above dates
+2. Best available rate per night (with meal plan details if applicable)
+3. Any honeymoon complimentary benefits or inclusions
+4. Payment and booking procedure
+
+We look forward to your reply and hope to establish a long-term partnership with your property.
+
+${sig}`,
+      }
+    }
     return {
       to: toEmail,
       subject: `Availability Request — ${checkin} to ${checkout} | ${hotelName}`,
@@ -110,24 +139,24 @@ ${sig}`,
   }
 
   if (type === 'reminder') {
+    const isManual = !hotel
     return {
       to: toEmail,
-      subject: `Follow-up: Availability Request — ${checkin} to ${checkout} | ${hotelName}`,
+      subject: `Follow-up: ${isManual ? 'Rate & Availability Inquiry' : 'Availability Request'} — ${checkin} to ${checkout} | ${hotelName}`,
       body: `Dear Reservations Team,
 
 I hope you are doing well.
 
-I am following up on my previous availability request for the below reservation, as we have not yet received a response:
+I am following up on my previous ${isManual ? 'rate and availability inquiry' : 'availability request'} for the below reservation, as we have not yet received a response:
 
 • Hotel: ${hotelName}
 • Room Type: ${roomName}${mealPlan ? ` (${mealPlan})` : ''}
 • Check-in: ${checkin}
 • Check-out: ${checkout}
 • Duration: ${nights} night${nights !== 1 ? 's' : ''}
-• Rate: ${currency} ${rate}/night${seasonNote} (as per our corporate contract)
-• Guests: Honeymoon couple
+${isManual ? '• Guests: Honeymoon couple (2 adults)' : `• Rate: ${currency} ${rate}/night${seasonNote} (as per our corporate contract)\n• Guests: Honeymoon couple`}
 
-Could you please kindly confirm availability at your earliest convenience? We would like to proceed with the booking as soon as possible.
+Could you please kindly ${isManual ? 'share the availability and best available rates' : 'confirm availability'} at your earliest convenience? We would like to proceed with the booking as soon as possible.
 
 Thank you for your time and we look forward to hearing from you.
 
