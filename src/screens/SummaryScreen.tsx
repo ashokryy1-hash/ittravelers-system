@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Copy, Trash2, User, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useSession } from '../context/SessionContext'
+import { useBasePath } from '../context/TripExplorerContext'
 import type { SessionSelection } from '../types'
 
 function groupByCity(selections: SessionSelection[]): Record<string, SessionSelection[]> {
@@ -13,15 +14,18 @@ function groupByCity(selections: SessionSelection[]): Record<string, SessionSele
   }, {})
 }
 
+function formatDate(d: string) {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 function buildSummaryText(
   grouped: Record<string, SessionSelection[]>,
   clientName: string,
-  tripDate: string,
+  hotelDates: Record<string, { checkIn: string; checkOut: string }>,
 ): string {
   const lines: string[] = ['ITTravelers Trip Explorer — Session Summary', '']
-  if (clientName) lines.push(`Client: ${clientName}`)
-  if (tripDate) lines.push(`Trip Start Date: ${new Date(tripDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`)
-  if (clientName || tripDate) lines.push('')
+  if (clientName) { lines.push(`Client: ${clientName}`); lines.push('') }
 
   for (const [city, items] of Object.entries(grouped)) {
     lines.push(city.toUpperCase())
@@ -29,7 +33,13 @@ function buildSummaryText(
     const tours = items.filter(i => i.type === 'tour')
     if (hotels.length > 0) {
       lines.push('Hotels:')
-      hotels.forEach(h => lines.push(`  - ${h.name}`))
+      hotels.forEach(h => {
+        const d = hotelDates[h.id]
+        const dateStr = d?.checkIn && d?.checkOut
+          ? ` — Check-in: ${formatDate(d.checkIn)}, Check-out: ${formatDate(d.checkOut)}`
+          : ''
+        lines.push(`  - ${h.name}${dateStr}`)
+      })
     }
     if (tours.length > 0) {
       lines.push('Tours:')
@@ -42,14 +52,14 @@ function buildSummaryText(
 
 export default function SummaryScreen() {
   const navigate = useNavigate()
-  const { selections, clearSession, totalCount } = useSession()
+  const basePath = useBasePath()
+  const { selections, clearSession, totalCount, hotelDates, setHotelDates } = useSession()
   const [clientName, setClientName] = useState('')
-  const [tripDate, setTripDate] = useState('')
 
   const grouped = groupByCity(selections)
 
   const handleCopy = async () => {
-    const text = buildSummaryText(grouped, clientName, tripDate)
+    const text = buildSummaryText(grouped, clientName, hotelDates)
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Summary copied to clipboard!')
@@ -88,7 +98,7 @@ export default function SummaryScreen() {
             <p className="font-display text-3xl text-gray-300 italic">Nothing selected yet.</p>
             <p className="font-body text-gray-400 mt-2">Go explore and add hotels and tours.</p>
             <button
-              onClick={() => navigate('/bali')}
+              onClick={() => navigate(`${basePath}/bali`)}
               className="mt-6 px-6 py-2.5 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-full font-body text-sm font-medium transition-colors"
             >
               Explore Bali
@@ -96,29 +106,18 @@ export default function SummaryScreen() {
           </div>
         ) : (
           <>
-            {/* Client details form */}
+            {/* Client name */}
             <div className="bg-white border border-ivory-200 rounded-2xl p-5 mb-6 shadow-sm">
-              <p className="font-body text-xs uppercase tracking-wider text-gray-400 mb-4">Client Details</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-center gap-3">
-                  <User size={16} className="text-terracotta-400 shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Client name"
-                    value={clientName}
-                    onChange={e => setClientName(e.target.value)}
-                    className="w-full border border-ivory-300 rounded-lg px-3 py-2 font-body text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 transition"
-                  />
-                </div>
-                <div className="flex items-center gap-3">
-                  <Calendar size={16} className="text-terracotta-400 shrink-0" />
-                  <input
-                    type="date"
-                    value={tripDate}
-                    onChange={e => setTripDate(e.target.value)}
-                    className="w-full border border-ivory-300 rounded-lg px-3 py-2 font-body text-sm text-gray-700 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 transition"
-                  />
-                </div>
+              <p className="font-body text-xs uppercase tracking-wider text-gray-400 mb-3">Client Details</p>
+              <div className="flex items-center gap-3">
+                <User size={16} className="text-terracotta-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Client name"
+                  value={clientName}
+                  onChange={e => setClientName(e.target.value)}
+                  className="w-full border border-ivory-300 rounded-lg px-3 py-2 font-body text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 transition"
+                />
               </div>
             </div>
 
@@ -151,16 +150,42 @@ export default function SummaryScreen() {
                     {items.filter(i => i.type === 'hotel').length > 0 && (
                       <div>
                         <p className="font-body text-xs uppercase tracking-wider text-gray-400 mb-1.5">Hotels</p>
-                        {items.filter(i => i.type === 'hotel').map(item => (
-                          <div key={item.id} className="flex items-start gap-3 py-2 px-4 bg-white rounded-xl border border-ivory-200 mb-2">
-                            <div>
+                        {items.filter(i => i.type === 'hotel').map(item => {
+                          const dates = hotelDates[item.id] ?? { checkIn: '', checkOut: '' }
+                          return (
+                            <div key={item.id} className="py-3 px-4 bg-white rounded-xl border border-ivory-200 mb-2">
                               <p className="font-body font-medium text-sm text-gray-800">{item.name}</p>
                               {item.details && (
-                                <p className="font-body text-xs text-gray-400 mt-0.5 line-clamp-1">{item.details}</p>
+                                <p className="font-body text-xs text-gray-400 mt-0.5 mb-3 line-clamp-1">{item.details}</p>
                               )}
+                              <div className="flex items-center gap-3 mt-2">
+                                <Calendar size={14} className="text-terracotta-400 shrink-0" />
+                                <div className="flex items-center gap-2 flex-1 flex-wrap">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-body text-xs text-gray-400">Check-in</span>
+                                    <input
+                                      type="date"
+                                      value={dates.checkIn}
+                                      onChange={e => setHotelDates(item.id, { ...dates, checkIn: e.target.value })}
+                                      className="border border-ivory-300 rounded-lg px-2 py-1 font-body text-xs text-gray-700 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 transition"
+                                    />
+                                  </div>
+                                  <span className="text-gray-300 font-body text-xs">→</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-body text-xs text-gray-400">Check-out</span>
+                                    <input
+                                      type="date"
+                                      value={dates.checkOut}
+                                      min={dates.checkIn || undefined}
+                                      onChange={e => setHotelDates(item.id, { ...dates, checkOut: e.target.value })}
+                                      className="border border-ivory-300 rounded-lg px-2 py-1 font-body text-xs text-gray-700 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 transition"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                     {items.filter(i => i.type === 'tour').length > 0 && (

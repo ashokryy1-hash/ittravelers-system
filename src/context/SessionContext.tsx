@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState } from 'react'
 import type { Hotel, Tour, City, SessionSelection } from '../types'
 
+interface HotelDates {
+  checkIn: string
+  checkOut: string
+}
+
 interface SessionContextValue {
   selections: SessionSelection[]
   toggleHotel: (hotel: Hotel, city: City) => void
@@ -8,12 +13,15 @@ interface SessionContextValue {
   isSelected: (type: 'hotel' | 'tour', id: string) => boolean
   clearSession: () => void
   totalCount: number
+  hotelDates: Record<string, HotelDates>
+  setHotelDates: (hotelId: string, dates: HotelDates) => void
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [selections, setSelections] = useState<SessionSelection[]>([])
+  const [hotelDates, setHotelDatesMap] = useState<Record<string, HotelDates>>({})
 
   const toggleHotel = (hotel: Hotel, city: City) => {
     setSelections(prev => {
@@ -51,7 +59,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return selections.some(s => s.type === type && s.id === id)
   }
 
-  const clearSession = () => setSelections([])
+  const setHotelDates = (hotelId: string, dates: HotelDates) => {
+    setHotelDatesMap(prev => ({ ...prev, [hotelId]: dates }))
+  }
+
+  const clearSession = () => {
+    setSelections([])
+    setHotelDatesMap({})
+  }
 
   return (
     <SessionContext.Provider value={{
@@ -61,6 +76,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       isSelected,
       clearSession,
       totalCount: selections.length,
+      hotelDates,
+      setHotelDates,
     }}>
       {children}
     </SessionContext.Provider>
