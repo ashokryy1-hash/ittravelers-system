@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Copy, Trash2, User, Calendar, Calculator } from 'lucide-react'
+import { ArrowLeft, Copy, Trash2, User, Calendar, Calculator, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useSession } from '../context/SessionContext'
 import { useBasePath } from '../context/TripExplorerContext'
+import { supabase } from '../lib/supabase'
 import type { SessionSelection } from '../types'
 
 function groupByCity(selections: SessionSelection[]): Record<string, SessionSelection[]> {
@@ -75,8 +76,34 @@ export default function SummaryScreen() {
     }
   }
 
+  const [saving, setSaving] = useState(false)
   const hotelSelections = selections.filter(s => s.type === 'hotel')
   const isHmsContext = basePath === '/hms/trip-explorer'
+
+  const destination = selections.length > 0
+    ? (selections[0].cityName.toLowerCase().includes('bali') || selections[0].cityName.toLowerCase().includes('ubud') || selections[0].cityName.toLowerCase().includes('canggu') || selections[0].cityName.toLowerCase().includes('seminyak') ? 'Bali'
+      : selections[0].cityName.toLowerCase().includes('vietnam') || selections[0].cityName.toLowerCase().includes('hanoi') || selections[0].cityName.toLowerCase().includes('hoi an') ? 'Vietnam'
+      : 'Bali')
+    : undefined
+
+  const handleSaveSession = async () => {
+    if (!clientName.trim()) { toast.error('Enter the client name first'); return }
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('explorer_sessions').insert({
+        client_name: clientName.trim(),
+        destination,
+        selections,
+        hotel_dates: hotelDates,
+      })
+      if (error) throw error
+      toast.success('Session saved!')
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleGetQuote = () => {
     const quoteData = hotelSelections.map(s => ({
@@ -152,6 +179,16 @@ export default function SummaryScreen() {
                 >
                   <Calculator size={15} />
                   Get Quote
+                </button>
+              )}
+              {isHmsContext && (
+                <button
+                  onClick={handleSaveSession}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-full font-body text-sm font-medium transition-colors shadow"
+                >
+                  <Save size={15} />
+                  {saving ? 'Saving…' : 'Save Session'}
                 </button>
               )}
               <button

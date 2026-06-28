@@ -5,7 +5,6 @@ import { Copy, ChevronLeft, ChevronRight, Sparkles, AlertTriangle, ChevronDown, 
 import { Link } from 'react-router-dom'
 import type { HmsHotel, HmsRoomType, HmsSurchargeRule, RateQuoteResult } from '../types'
 import { getSeasonForStay, getSurcharge, seasonLabel, nightsBetween } from '../lib/season'
-import { getSettings } from '../lib/settings'
 import toast from 'react-hot-toast'
 
 interface SessionHotelItem {
@@ -83,7 +82,6 @@ export default function RateViewerScreen() {
   const [searching, setSearching] = useState(false)
   const [sessionRows, setSessionRows] = useState<SessionQuoteRow[] | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
-  const [sessionRates, setSessionRates] = useState({ idrToEgp: 0, thbToEgp: 0, usdToEgp: 0 })
 
   const { data: hotels } = useQuery<HmsHotel[]>({
     queryKey: ['hms_hotels_quote'],
@@ -133,11 +131,6 @@ export default function RateViewerScreen() {
   async function runSessionQuote(items: SessionHotelItem[]) {
     setSessionLoading(true)
     setResults(null)
-    const settings = await getSettings()
-    const idrToEgp = parseFloat(settings.IDR_to_EGP)
-    const thbToEgp = parseFloat(settings.THB_to_EGP)
-    const usdToEgp = parseFloat(settings.USD_to_EGP)
-    setSessionRates({ idrToEgp, thbToEgp, usdToEgp })
     const allHotels = hotels ?? []
     const allRooms = rooms ?? []
     const allRules = surchargeRules ?? []
@@ -148,7 +141,6 @@ export default function RateViewerScreen() {
 
       const candidates = findBestHotelMatches(item.name, allHotels)
       if (!candidates.length) return { item, matched: false }
-      // Auto-match if top candidate is confident (score ≥ 0.5), else show suggestions
       if (candidates[0].score < 0.5) {
         return { item, matched: false, suggestions: candidates.map(c => c.hotel) }
       }
@@ -158,10 +150,9 @@ export default function RateViewerScreen() {
       const destRules = allRules.filter(r => (r as any).hms_destinations?.name === (hotel as any).hms_destinations?.name)
       const { season, rule } = getSeasonForStay(item.checkIn, item.checkOut, destRules)
 
-      // Try to match room type by name (partial match)
       let room = hotelRooms.find(r => r.name.toLowerCase() === item.roomType.toLowerCase())
       if (!room && item.roomType) room = hotelRooms.find(r => r.name.toLowerCase().includes(item.roomType.toLowerCase()))
-      if (!room) room = hotelRooms[0] // fallback: first room
+      if (!room) room = hotelRooms[0]
 
       if (!room) return { item, matched: true, noRoom: true }
 
@@ -175,15 +166,11 @@ export default function RateViewerScreen() {
       const surcharge = getSurcharge(season, rule, room.room_category as 'room' | 'villa', hotel.surcharge_waiver)
       const totalPerNight = baseRate + surcharge
       const totalStay = totalPerNight * nights
-      let totalEgp = 0
-      if (room.currency === 'IDR') totalEgp = totalStay * idrToEgp
-      else if (room.currency === 'THB') totalEgp = totalStay * thbToEgp
-      else totalEgp = totalStay * usdToEgp
 
       return {
         item,
         matched: true,
-        result: { hotel, roomType: room, season, baseRate, surcharge, totalPerNight, totalStay, totalEgp, nights },
+        result: { hotel, roomType: room, season, baseRate, surcharge, totalPerNight, totalStay, nights },
       }
     }))
 
@@ -194,8 +181,6 @@ export default function RateViewerScreen() {
   async function search() {
     if (!checkin || !checkout) { toast.error('Enter check-in and check-out dates'); return }
     setSearching(true)
-    const settings = await getSettings()
-    const idrToEgp = parseFloat(settings.IDR_to_EGP)
     const nights = nightsBetween(checkin, checkout)
     if (nights <= 0) { toast.error('Check-out must be after check-in'); setSearching(false); return }
 
@@ -230,15 +215,9 @@ export default function RateViewerScreen() {
         const totalPerNight = baseRate + surcharge
         const totalStay = totalPerNight * nights
 
-        // Currency conversion
-        let totalEgp = 0
-        if (room.currency === 'IDR') totalEgp = totalStay * idrToEgp
-        else if (room.currency === 'THB') totalEgp = totalStay * parseFloat(settings.THB_to_EGP)
-        else totalEgp = totalStay * parseFloat(settings.USD_to_EGP)
+        if (maxBudget && totalStay > parseFloat(maxBudget)) continue
 
-        if (maxBudget && totalEgp > parseFloat(maxBudget)) continue
-
-        quoteResults.push({ hotel, roomType: room, season, baseRate, surcharge, totalPerNight, totalStay, totalEgp, nights })
+        quoteResults.push({ hotel, roomType: room, season, baseRate, surcharge, totalPerNight, totalStay, nights })
       }
     }
 
@@ -278,23 +257,20 @@ export default function RateViewerScreen() {
                     row={row}
                     rooms={rooms ?? []}
                     surchargeRules={surchargeRules ?? []}
-                    idrToEgp={sessionRates.idrToEgp}
-                    thbToEgp={sessionRates.thbToEgp}
-                    usdToEgp={sessionRates.usdToEgp}
                     onResolved={updated => setSessionRows(prev => prev ? prev.map((r, j) => j === i ? updated : r) : prev)}
                   />
                 ))}
               </div>
               {(() => {
-                const totalEgp = sessionRows.reduce((sum, r) => sum + (r.result?.totalEgp ?? 0), 0)
+                const totalIdr = sessionRows.reduce((sum, r) => sum + (r.result?.totalStay ?? 0), 0)
                 const matched = sessionRows.filter(r => r.result).length
                 const total = sessionRows.length
                 return (
                   <div className="mt-4 pt-4 border-t border-amber-200 flex items-center justify-between">
                     <span className="text-sm text-amber-700">{matched}/{total} hotels matched</span>
-                    {totalEgp > 0 && (
+                    {totalIdr > 0 && (
                       <span className="font-bold text-lg text-amber-800">
-                        Total: EGP {Math.round(totalEgp).toLocaleString()}
+                        Total: IDR {totalIdr.toLocaleString()}
                       </span>
                     )}
                   </div>
@@ -324,8 +300,8 @@ export default function RateViewerScreen() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Max budget EGP (optional)</label>
-            <input type="number" className={inp} placeholder="e.g. 5000" value={maxBudget} onChange={e => setMaxBudget(e.target.value)} />
+            <label className="block text-xs font-medium text-gray-600 mb-1">Max budget IDR (optional)</label>
+            <input type="number" className={inp} placeholder="e.g. 5000000" value={maxBudget} onChange={e => setMaxBudget(e.target.value)} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Check-in</label>
@@ -372,23 +348,16 @@ function SessionQuoteRow({
   row,
   rooms,
   surchargeRules,
-  idrToEgp,
-  thbToEgp,
-  usdToEgp,
   onResolved,
 }: {
   row: SessionQuoteRow
   rooms: HmsRoomType[]
   surchargeRules: HmsSurchargeRule[]
-  idrToEgp: number
-  thbToEgp: number
-  usdToEgp: number
   onResolved: (updated: SessionQuoteRow) => void
 }) {
   const { item, matched, result, noRoom, suggestions } = row
   const [open, setOpen] = useState(false)
 
-  // Suggestions mode: low-confidence fuzzy matches
   if (!matched && suggestions && suggestions.length > 0) {
     return (
       <div className="bg-white rounded-lg border border-amber-200 overflow-hidden">
@@ -418,11 +387,7 @@ function SessionQuoteRow({
                 const surcharge = getSurcharge(season, rule, room.room_category as 'room' | 'villa', h.surcharge_waiver)
                 const totalPerNight = baseRate + surcharge
                 const totalStay = totalPerNight * nights
-                let totalEgp = 0
-                if (room.currency === 'IDR') totalEgp = totalStay * idrToEgp
-                else if (room.currency === 'THB') totalEgp = totalStay * thbToEgp
-                else totalEgp = totalStay * usdToEgp
-                onResolved({ item, matched: true, result: { hotel: h, roomType: room, season, baseRate, surcharge, totalPerNight, totalStay, totalEgp, nights } })
+                onResolved({ item, matched: true, result: { hotel: h, roomType: room, season, baseRate, surcharge, totalPerNight, totalStay, nights } })
               }}
               className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-amber-50 transition-colors"
             >
@@ -456,7 +421,7 @@ function SessionQuoteRow({
     )
   }
 
-  const { hotel, roomType, season, baseRate, surcharge, totalPerNight, totalStay, totalEgp, nights } = result
+  const { hotel, roomType, season, baseRate, surcharge, totalPerNight, totalStay, nights } = result
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -472,8 +437,8 @@ function SessionQuoteRow({
           <span className="text-xs text-slate-400 ml-2">{item.cityName} · {nights}n · {item.checkIn} → {item.checkOut}</span>
         </div>
         <div className="text-right shrink-0">
-          <div className="text-sm font-bold text-terracotta-700">EGP {Math.round(totalEgp).toLocaleString()}</div>
-          <div className="text-xs text-slate-400">{roomType.currency} {totalStay.toLocaleString()} total</div>
+          <div className="text-sm font-bold text-terracotta-700">IDR {totalStay.toLocaleString()}</div>
+          <div className="text-xs text-slate-400">IDR {totalPerNight.toLocaleString()}/night</div>
         </div>
         {open ? <ChevronUp size={14} className="text-slate-400 shrink-0" /> : <ChevronDown size={14} className="text-slate-400 shrink-0" />}
       </button>
@@ -482,11 +447,11 @@ function SessionQuoteRow({
           <Metric label="Room" value={roomType.name} />
           <Metric label="Meal plan" value={roomType.meal_plan} />
           <Metric label="Season" value={seasonLabel(season)} />
-          <Metric label="Room type" value={item.roomType || roomType.name} />
-          <Metric label="Base rate/night" value={`${roomType.currency} ${baseRate.toLocaleString()}`} />
-          <Metric label="Surcharge/night" value={surcharge > 0 ? `${roomType.currency} ${surcharge.toLocaleString()}` : 'None'} />
-          <Metric label="Total/night" value={`${roomType.currency} ${totalPerNight.toLocaleString()}`} highlight />
-          <Metric label={`Total (${nights} nights)`} value={`EGP ${Math.round(totalEgp).toLocaleString()}`} highlight />
+          <Metric label="Nights" value={`${nights}n`} />
+          <Metric label="Base rate/night" value={`IDR ${baseRate.toLocaleString()}`} />
+          <Metric label="Surcharge/night" value={surcharge > 0 ? `IDR ${surcharge.toLocaleString()}` : 'None'} />
+          <Metric label="Total/night" value={`IDR ${totalPerNight.toLocaleString()}`} highlight />
+          <Metric label={`Total (${nights} nights)`} value={`IDR ${totalStay.toLocaleString()}`} highlight />
         </div>
       )}
     </div>
@@ -494,7 +459,7 @@ function SessionQuoteRow({
 }
 
 function QuoteCard({ result, checkin, checkout }: { result: RateQuoteResult; checkin: string; checkout: string }) {
-  const { hotel, roomType, season, baseRate, surcharge, totalPerNight, totalStay, totalEgp, nights } = result
+  const { hotel, roomType, season, baseRate, surcharge, totalPerNight, totalStay, nights } = result
 
   function buildWhatsApp(): string {
     const currency = roomType.currency
@@ -503,7 +468,7 @@ Room: ${roomType.name} (${roomType.meal_plan})
 Dates: ${checkin} → ${checkout} (${nights} nights)
 Season: ${seasonLabel(season)}
 Rate: ${currency} ${baseRate.toLocaleString()}${surcharge > 0 ? ` + ${currency} ${surcharge.toLocaleString()} surcharge` : ''} = ${currency} ${totalPerNight.toLocaleString()}/night
-Total: ${currency} ${totalStay.toLocaleString()} ≈ EGP ${Math.round(totalEgp).toLocaleString()}${roomType.notes ? `\nIncludes: ${roomType.notes}` : ''}`
+Total: ${currency} ${totalStay.toLocaleString()}${roomType.notes ? `\nIncludes: ${roomType.notes}` : ''}`
   }
 
   function copy() {
@@ -531,11 +496,10 @@ Total: ${currency} ${totalStay.toLocaleString()} ≈ EGP ${Math.round(totalEgp).
       </div>
 
       <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-        <Metric label="Base rate/night" value={`${roomType.currency} ${baseRate.toLocaleString()}`} />
-        <Metric label="Surcharge/night" value={surcharge > 0 ? `${roomType.currency} ${surcharge.toLocaleString()}` : 'None'} />
-        <Metric label="Total/night" value={`${roomType.currency} ${totalPerNight.toLocaleString()}`} highlight />
-        <Metric label={`Total ${nights}n`} value={`${roomType.currency} ${totalStay.toLocaleString()}`} />
-        <Metric label="EGP equivalent" value={`EGP ${Math.round(totalEgp).toLocaleString()}`} highlight />
+        <Metric label="Base rate/night" value={`IDR ${baseRate.toLocaleString()}`} />
+        <Metric label="Surcharge/night" value={surcharge > 0 ? `IDR ${surcharge.toLocaleString()}` : 'None'} />
+        <Metric label="Total/night" value={`IDR ${totalPerNight.toLocaleString()}`} highlight />
+        <Metric label={`Total ${nights}n`} value={`IDR ${totalStay.toLocaleString()}`} highlight />
         <Metric label="Season" value={seasonLabel(season)} />
         {hotel.surcharge_waiver !== 'none' && <Metric label="Waiver" value={hotel.surcharge_waiver} />}
       </div>

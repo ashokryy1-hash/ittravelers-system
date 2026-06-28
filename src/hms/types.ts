@@ -146,6 +146,5 @@ export interface RateQuoteResult {
   surcharge: number
   totalPerNight: number
   totalStay: number
-  totalEgp: number
   nights: number
 }

@@ -119,7 +119,15 @@ export default function HomeScreen() {
         </div>
       </main>
 
-      <footer className="text-center pb-8">
+      <footer className="text-center pb-8 flex items-center justify-center gap-6">
+        {basePath === '/hms/trip-explorer' && (
+          <button
+            onClick={() => navigate(`${basePath}/sessions`)}
+            className="font-body text-xs text-gray-400 hover:text-terracotta-500 transition-colors uppercase tracking-widest"
+          >
+            Client Sessions
+          </button>
+        )}
         <button
           onClick={() => navigate(`${basePath}/admin`)}
           className="font-body text-xs text-gray-300 hover:text-gray-500 transition-colors uppercase tracking-widest"
