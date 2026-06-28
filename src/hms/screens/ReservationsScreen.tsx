@@ -741,6 +741,14 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
   const [saving, setSaving] = useState(false)
   const [detectedSeason, setDetectedSeason] = useState<'low' | 'high' | 'peak'>('low')
 
+  const { data: manualHotels, refetch: refetchManualHotels } = useQuery<{ id: string; name: string; city: string | null }[]>({
+    queryKey: ['hms_manual_hotels'],
+    queryFn: async () => {
+      const { data } = await supabase.from('hms_manual_hotels').select('id, name, city').order('name')
+      return data ?? []
+    },
+  })
+
   const { data: hotels } = useQuery<HmsHotel[]>({
     queryKey: ['hms_hotels_booking'],
     queryFn: async () => {
@@ -841,6 +849,11 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
     })
     setSaving(false)
     if (error) { toast.error(error.message); return }
+    // Save manual hotel for future reuse
+    if (hotelMode === 'manual' && form.manual_hotel_name.trim()) {
+      await supabase.from('hms_manual_hotels').upsert({ name: form.manual_hotel_name.trim() }, { onConflict: 'name' })
+      refetchManualHotels()
+    }
     onSaved()
     toast.success('Booking created')
   }
@@ -894,7 +907,19 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
           <>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Hotel name *</label>
-              <input className={inp} placeholder="e.g. Four Seasons Bali at Sayan" value={form.manual_hotel_name} onChange={set('manual_hotel_name')} />
+              <input
+                className={inp}
+                list="manual-hotels-list"
+                placeholder="Type or select a previously added hotel…"
+                value={form.manual_hotel_name}
+                onChange={set('manual_hotel_name')}
+              />
+              <datalist id="manual-hotels-list">
+                {manualHotels?.map(h => <option key={h.id} value={h.name}>{h.city ? `${h.name} — ${h.city}` : h.name}</option>)}
+              </datalist>
+              {manualHotels && manualHotels.length > 0 && (
+                <p className="text-xs text-slate-400 mt-1">Previously added hotels appear as suggestions — or type a new one</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Room type</label>
