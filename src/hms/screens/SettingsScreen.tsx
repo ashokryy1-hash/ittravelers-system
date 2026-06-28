@@ -1,9 +1,28 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSettings, saveSetting } from '../lib/settings'
 import type { HmsSettings } from '../types'
-import { Save } from 'lucide-react'
+import { Save, Trash2, UserPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { supabase } from '../../lib/supabase'
+import { MODULE_KEYS } from '../components/HmsLayout'
+
+const MODULE_LABELS: Record<string, string> = {
+  dashboard:    '📊 Dashboard',
+  leads:        '👥 Leads',
+  discovery:    '🔍 Discovery',
+  outreach:     '📨 Outreach',
+  rates:        '🏨 Rates',
+  reservations: '📅 Reservations',
+  tours:        '🗺 Tours',
+  settings:     '⚙️ Settings',
+}
+
+interface UserPermission {
+  id: string
+  email: string
+  allowed_modules: string[]
+}
 
 export default function SettingsScreen() {
   const { data, refetch } = useQuery<HmsSettings>({
@@ -100,6 +119,8 @@ export default function SettingsScreen() {
         </button>
       </div>
 
+      <TeamSection />
+
       {/* Setup guides */}
       <div className="mt-10 space-y-6">
         <SetupGuide
@@ -185,6 +206,138 @@ function SetupGuide({ title, steps }: { title: string; steps: string[] }) {
             </li>
           ))}
         </ol>
+      )}
+    </div>
+  )
+}
+
+function TeamSection() {
+  const qc = useQueryClient()
+  const [users, setUsers] = useState<UserPermission[]>([])
+  const [email, setEmail] = useState('')
+  const [selected, setSelected] = useState<string[]>(['reservations'])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    supabase.from('hms_user_permissions').select('*').order('created_at')
+      .then(({ data }) => { if (data) setUsers(data) })
+  }, [])
+
+  function toggleModule(key: string) {
+    setSelected(s => s.includes(key) ? s.filter(k => k !== key) : [...s, key])
+  }
+
+  async function addUser() {
+    if (!email.trim()) return toast.error('Email required')
+    if (selected.length === 0) return toast.error('Select at least one module')
+    setSaving(true)
+    const { data, error } = await supabase.from('hms_user_permissions')
+      .upsert({ email: email.trim().toLowerCase(), allowed_modules: selected }, { onConflict: 'email' })
+      .select().single()
+    setSaving(false)
+    if (error) return toast.error(error.message)
+    setUsers(u => {
+      const existing = u.findIndex(x => x.email === data.email)
+      if (existing >= 0) { const copy = [...u]; copy[existing] = data; return copy }
+      return [...u, data]
+    })
+    setEmail('')
+    setSelected(['reservations'])
+    toast.success('User saved!')
+  }
+
+  async function removeUser(id: string) {
+    if (!confirm('Remove this user?')) return
+    await supabase.from('hms_user_permissions').delete().eq('id', id)
+    setUsers(u => u.filter(x => x.id !== id))
+    toast.success('User removed')
+  }
+
+  async function updateModules(user: UserPermission, key: string) {
+    const updated = user.allowed_modules.includes(key)
+      ? user.allowed_modules.filter(k => k !== key)
+      : [...user.allowed_modules, key]
+    await supabase.from('hms_user_permissions').update({ allowed_modules: updated }).eq('id', user.id)
+    setUsers(u => u.map(x => x.id === user.id ? { ...x, allowed_modules: updated } : x))
+  }
+
+  return (
+    <div className="mt-10">
+      <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-4 pb-2 border-b border-slate-200">Team — User Access</h2>
+      <p className="text-xs text-slate-400 mb-4">Add team members and choose which modules they can see. Users not listed here have full admin access.</p>
+
+      {/* Add user form */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">User email (must exist in Supabase Auth)</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="e.g. sara@ittravelers.com"
+            className={inp}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-2">Modules they can access:</label>
+          <div className="flex flex-wrap gap-2">
+            {MODULE_KEYS.map(key => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggleModule(key)}
+                className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                  selected.includes(key)
+                    ? 'bg-teal-600 text-white border-teal-600'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {MODULE_LABELS[key]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={addUser}
+          disabled={saving}
+          className="flex items-center gap-2 bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+        >
+          <UserPlus size={14} />
+          {saving ? 'Saving…' : 'Add / Update User'}
+        </button>
+      </div>
+
+      {/* Existing users */}
+      {users.length === 0 ? (
+        <p className="text-sm text-slate-400">No team users added yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {users.map(user => (
+            <div key={user.id} className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-slate-800">{user.email}</span>
+                <button onClick={() => removeUser(user.id)} className="text-red-400 hover:text-red-600">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {MODULE_KEYS.map(key => (
+                  <button
+                    key={key}
+                    onClick={() => updateModules(user, key)}
+                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                      user.allowed_modules.includes(key)
+                        ? 'bg-teal-600 text-white border-teal-600'
+                        : 'bg-white text-slate-400 border-slate-200'
+                    }`}
+                  >
+                    {MODULE_LABELS[key]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
