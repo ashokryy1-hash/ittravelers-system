@@ -32,6 +32,7 @@ interface Lead {
   lead_type: 'honeymoon' | 'group'
   trip_id: string | null
   priority: 'hot' | 'warm' | 'cold' | 'on_hold' | null
+  package_link: string | null
   created_at: string
   updated_at: string
 }
@@ -189,15 +190,30 @@ ${address}
 Please let me know which day works for you and I'll confirm the time. ☀️`
 }
 
-function buildHoneymoonReminderMessage(lead: Lead): string {
+function buildHoneymoonReminderDay2(lead: Lead): string {
   const name = lead.name.split(' ')[0]
-  return `Ahlan ${name}! 🌺
+  return `Hi ${name}! 😊
 
-Just checking in — I wanted to make sure you received my previous message about your honeymoon plans. 😊
+I know wedding planning keeps everyone busy, so I just wanted to check in.
 
-We'd love to help you create a beautiful experience for ${lead.destination}!
+Whenever you start thinking about your honeymoon, I'd be happy to help you build a trip that's completely tailored to you — no fixed packages, just what fits your style and budget. 🤍
 
-Would you prefer to meet at our office or via Google Meet? Just reply and I'll arrange everything. 🙏`
+If you're still interested, just send me a quick "yes" and we'll continue from there.`
+}
+
+function buildHoneymoonReminderDay5(lead: Lead): string {
+  const name = lead.name.split(' ')[0]
+  const packageLink = (lead as any).package_link
+  return `Hi ${name}! 😊
+
+I know you may still be busy with wedding planning, so this will be my last message. 🤍
+
+I wanted to share a real honeymoon package we've designed to give you some inspiration:
+${packageLink || '[Add a package link to this lead]'}
+
+Every couple is different, which is why we don't sell fixed packages — we build each honeymoon from scratch to match your travel style, budget, and the memories you want to create.
+
+If it looks like the kind of trip you've been dreaming about, just let me know and we'll create your own version together. ✨`
 }
 
 function buildFollowUpAfterMeetingMessage(lead: Lead): string {
@@ -701,8 +717,12 @@ function LeadCard({ lead, settings, trip }: { lead: Lead; settings: HmsSettings 
     status: lead.status === 'New' ? 'Contacted' : lead.status,
   })
   const sendReminder = () => sendViaAPI(
-    isGroup ? buildGroupReminderMessage(lead, trip) : buildHoneymoonReminderMessage(lead),
-    'Reminder'
+    isGroup ? buildGroupReminderMessage(lead, trip) : buildHoneymoonReminderDay2(lead),
+    'Reminder Day 2'
+  )
+  const sendReminderDay5 = () => sendViaAPI(
+    buildHoneymoonReminderDay5(lead),
+    'Reminder Day 5'
   )
   const sendMeetingLink = () => settings && sendViaAPI(buildMeetingLinkMessage(lead, settings), 'Meeting link', { status: 'Meeting' })
   const sendDeposit = () => sendViaAPI(buildGroupDepositMessage(lead, trip), 'Deposit info', { status: 'Proposal Sent' })
@@ -814,13 +834,37 @@ function LeadCard({ lead, settings, trip }: { lead: Lead; settings: HmsSettings 
               onSend={sendGreeting} onManual={() => { window.open(waLink, '_blank'); markSent() }}
               sending={sending === 'Greeting'} />
 
-            {lead.whatsapp_sent && lead.status === 'Contacted' && (
-              <MessageBlock step="2" label="Follow-up Reminder" color="orange" sent={false}
-                message={isGroup ? buildGroupReminderMessage(lead, trip) : buildHoneymoonReminderMessage(lead)}
+            {lead.whatsapp_sent && lead.status === 'Contacted' && !isGroup && (
+              <MessageBlock step="2" label="Day 2 — Friendly Check-in" color="orange" sent={false}
+                message={buildHoneymoonReminderDay2(lead)}
                 onSend={sendReminder}
-                onManual={() => window.open(buildWhatsAppLink(lead.phone, isGroup ? buildGroupReminderMessage(lead, trip) : buildHoneymoonReminderMessage(lead)), '_blank')}
-                sending={sending === 'Reminder'}
-                hint={needsFollowUp ? `⚠️ ${daysSinceUpdate}d no reply` : undefined} />
+                onManual={() => window.open(buildWhatsAppLink(lead.phone, buildHoneymoonReminderDay2(lead)), '_blank')}
+                sending={sending === 'Reminder Day 2'}
+                hint={daysSinceUpdate >= 2 ? `⚠️ ${daysSinceUpdate}d no reply` : undefined} />
+            )}
+
+            {lead.whatsapp_sent && lead.status === 'Contacted' && !isGroup && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-500">📎 Sample package link (for Day 5 message)</span>
+                </div>
+                <PackageLinkField lead={lead} />
+                <MessageBlock step="3" label="Day 5 — Sample Package" color="rose" sent={false}
+                  message={buildHoneymoonReminderDay5(lead)}
+                  onSend={sendReminderDay5}
+                  onManual={() => window.open(buildWhatsAppLink(lead.phone, buildHoneymoonReminderDay5(lead)), '_blank')}
+                  sending={sending === 'Reminder Day 5'}
+                  hint={daysSinceUpdate >= 5 ? `⚠️ ${daysSinceUpdate}d no reply — last message` : 'Last message before stopping'} />
+              </div>
+            )}
+
+            {lead.whatsapp_sent && lead.status === 'Contacted' && isGroup && (
+              <MessageBlock step="2" label="Follow-up Reminder" color="orange" sent={false}
+                message={buildGroupReminderMessage(lead, trip)}
+                onSend={sendReminder}
+                onManual={() => window.open(buildWhatsAppLink(lead.phone, buildGroupReminderMessage(lead, trip)), '_blank')}
+                sending={sending === 'Reminder Day 2'}
+                hint={daysSinceUpdate >= 2 ? `⚠️ ${daysSinceUpdate}d no reply` : undefined} />
             )}
 
             {isGroup && (lead.status === 'Replied' || lead.status === 'Proposal Sent' || lead.status === 'Booked') && (
@@ -887,8 +931,37 @@ const COLOR_MAP = {
   green: { bg: 'bg-green-50', border: 'border-green-100', btn: 'bg-green-500 hover:bg-green-600', badge: 'bg-green-100 text-green-700' },
   teal: { bg: 'bg-teal-50', border: 'border-teal-100', btn: 'bg-teal-600 hover:bg-teal-700', badge: 'bg-teal-100 text-teal-700' },
   purple: { bg: 'bg-purple-50', border: 'border-purple-100', btn: 'bg-purple-600 hover:bg-purple-700', badge: 'bg-purple-100 text-purple-700' },
+  rose: { bg: 'bg-rose-50', border: 'border-rose-100', btn: 'bg-rose-500 hover:bg-rose-600', badge: 'bg-rose-100 text-rose-700' },
   orange: { bg: 'bg-orange-50', border: 'border-orange-100', btn: 'bg-orange-500 hover:bg-orange-600', badge: 'bg-orange-100 text-orange-700' },
   indigo: { bg: 'bg-indigo-50', border: 'border-indigo-100', btn: 'bg-indigo-600 hover:bg-indigo-700', badge: 'bg-indigo-100 text-indigo-700' },
+}
+
+function PackageLinkField({ lead }: { lead: Lead }) {
+  const qc = useQueryClient()
+  const [link, setLink] = useState(lead.package_link ?? '')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    setSaving(true)
+    await supabase.from('hms_leads').update({ package_link: link.trim() || null }).eq('id', lead.id)
+    qc.invalidateQueries({ queryKey: ['hms_leads'] })
+    setSaving(false)
+    toast.success('Package link saved')
+  }
+
+  return (
+    <div className="flex gap-2">
+      <input
+        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal-400"
+        placeholder="Paste sample itinerary link (Google Drive, PDF, etc.)"
+        value={link}
+        onChange={e => setLink(e.target.value)}
+      />
+      <button onClick={save} disabled={saving} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg">
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  )
 }
 
 function MessageBlock({ step, label, color, sent, sentAt, message, onSend, onManual, sending, hint }: {
