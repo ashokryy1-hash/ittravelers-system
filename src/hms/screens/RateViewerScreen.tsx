@@ -27,13 +27,17 @@ interface SessionQuoteRow {
 // ─── Fuzzy hotel name matching ────────────────────────────────────────────────
 
 const STOP_WORDS = new Set([
-  'the', 'a', 'an', 'and', 'by', 'at', 'in', 'of', 'de',
+  'the', 'a', 'an', 'and', 'by', 'at', 'in', 'of', 'de', 'el', 'la',
   'hotel', 'resort', 'villa', 'villas', 'boutique', 'luxury',
-  'beach', 'spa', 'club', 'estate', 'retreat',
+  'beach', 'spa', 'club', 'estate', 'retreat', 'suites', 'suite',
+  'properties', 'property', 'hospitality', 'management', 'group',
+  'collection', 'residences', 'residence', 'inn',
+  'ini', 'vie',
   'bali', 'ubud', 'canggu', 'seminyak', 'nusa', 'dua', 'sanur',
-  'jimbaran', 'kuta', 'legian', 'uluwatu', 'lombok',
+  'jimbaran', 'kuta', 'legian', 'uluwatu', 'lombok', 'berawa',
   'phuket', 'koh', 'samui', 'krabi', 'chiang', 'mai', 'bangkok',
   'hanoi', 'hoi', 'an', 'hcmc', 'saigon', 'danang',
+  'maldives', 'thailand', 'vietnam', 'indonesia',
 ])
 
 function tokenize(name: string): Set<string> {
@@ -51,20 +55,20 @@ function hotelMatchScore(a: string, b: string): number {
   if (!tokA.size || !tokB.size) return 0
   let intersection = 0
   for (const t of tokA) if (tokB.has(t)) intersection++
-  // Jaccard similarity weighted toward shorter name (avoid false negatives)
+  // Containment: fraction of the SHORTER name's tokens found in the longer name.
+  // This gives 1.0 when "Suara Alam" tokens are all inside
+  // "Suara Alam Ubud Villa by Ini Vie Hospitality" — Jaccard would penalise the length.
+  const containment = intersection / Math.min(tokA.size, tokB.size)
+  // Blend with a small Jaccard term to penalise completely unrelated names of equal short length
   const union = tokA.size + tokB.size - intersection
-  const jaccard = intersection / union
-  // Bonus if one name starts with the other's first token
-  const firstA = [...tokA][0] ?? ''
-  const firstB = [...tokB][0] ?? ''
-  const prefixBonus = (firstA && firstB && (firstA === firstB)) ? 0.15 : 0
-  return Math.min(1, jaccard + prefixBonus)
+  const jaccard = union > 0 ? intersection / union : 0
+  return containment * 0.8 + jaccard * 0.2
 }
 
 function findBestHotelMatches(name: string, allHotels: HmsHotel[]): { hotel: HmsHotel; score: number }[] {
   return allHotels
     .map(h => ({ hotel: h, score: hotelMatchScore(name, h.name) }))
-    .filter(x => x.score > 0.25)
+    .filter(x => x.score > 0.3)
     .sort((a, b) => b.score - a.score)
     .slice(0, 4)
 }
