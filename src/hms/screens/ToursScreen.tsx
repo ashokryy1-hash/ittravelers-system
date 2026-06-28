@@ -115,18 +115,27 @@ function buildWhatsApp(tour: Tour): string {
   const lines: string[] = ['🌼🌼', tour.client_name, `${tour.pax} pax`]
   if (contactName) lines.push(`📞 ${contactName}${contactPhone ? ` — ${contactPhone}` : ''}`)
   for (const day of days) {
-    lines.push('', '🌴', formatDay(day.date, day.sort_order + 1))
+    lines.push('', `🌴 ${formatDay(day.date, day.sort_order + 1)}`)
     const acts = [...(day.hms_tour_activities ?? [])].sort((a, b) => a.sort_order - b.sort_order)
-    for (const act of acts) {
+    const stops = acts.filter(a => parseActivity(a.description).type === 'stop')
+    const transfers = acts.filter(a => parseActivity(a.description).type !== 'stop')
+    // Tour stops — no time, bullet list
+    for (const act of stops) {
       const p = parseActivity(act.description)
-      if (p.type === 'transfer') {
-        lines.push(`${act.time} 🚗 Transfer: ${p.from} → ${p.to}${p.flight ? ` (Flight: ${p.flight})` : ''}`)
-      } else if (p.type === 'airport-pickup') {
-        lines.push(`${act.time} ✈️ Airport Pickup: Flight ${p.flight} → ${p.to}`)
-      } else if (p.type === 'airport-dropoff') {
-        lines.push(`${act.time} 🛫 Airport Drop-off: ${p.from} → Flight ${p.flight}`)
-      } else {
-        lines.push(`${act.time} ${p.text}`)
+      if (p.text.trim()) lines.push(`• ${p.text}`)
+    }
+    // Transfers — with time
+    if (transfers.length > 0) {
+      if (stops.length > 0) lines.push('')
+      for (const act of transfers) {
+        const p = parseActivity(act.description)
+        if (p.type === 'transfer') {
+          lines.push(`${act.time} 🚗 Transfer: ${p.from} → ${p.to}${p.flight ? ` (Flight: ${p.flight})` : ''}`)
+        } else if (p.type === 'airport-pickup') {
+          lines.push(`${act.time} ✈️ Airport Pickup: Flight ${p.flight} → ${p.to}`)
+        } else if (p.type === 'airport-dropoff') {
+          lines.push(`${act.time} 🛫 Airport Drop-off: ${p.from} → Flight ${p.flight}`)
+        }
       }
     }
     lines.push('End of program')
