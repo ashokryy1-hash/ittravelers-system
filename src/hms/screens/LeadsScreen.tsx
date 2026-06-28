@@ -325,7 +325,7 @@ export default function LeadsScreen() {
       </div>
 
       {tab === 'honeymoon' && (
-        <HoneymoonTab leads={honeymoonLeads} settings={settings ?? null} isLoading={leadsLoading} />
+        <HoneymoonTab leads={honeymoonLeads} trips={trips} settings={settings ?? null} isLoading={leadsLoading} />
       )}
       {tab === 'group' && (
         <GroupTab leads={groupLeads} trips={trips} settings={settings ?? null} isLoading={leadsLoading} />
@@ -347,7 +347,7 @@ export default function LeadsScreen() {
 
 // ─── Honeymoon Tab ────────────────────────────────────────────────────────────
 
-function HoneymoonTab({ leads, settings, isLoading }: { leads: Lead[]; settings: HmsSettings | null; isLoading: boolean }) {
+function HoneymoonTab({ leads, trips, settings, isLoading }: { leads: Lead[]; trips: Trip[]; settings: HmsSettings | null; isLoading: boolean }) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<LeadStatus | 'All'>('All')
 
@@ -384,7 +384,7 @@ function HoneymoonTab({ leads, settings, isLoading }: { leads: Lead[]; settings:
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map(lead => <LeadCard key={lead.id} lead={lead} settings={settings} trip={null} />)}
+            {filtered.map(lead => <LeadCard key={lead.id} lead={lead} settings={settings} trip={null} trips={trips} />)}
           </div>
         )}
     </div>
@@ -449,7 +449,7 @@ function GroupTab({ leads, trips, settings, isLoading }: { leads: Lead[]; trips:
         ) : (
           <div className="space-y-3">
             {filtered.map(lead => (
-              <LeadCard key={lead.id} lead={lead} settings={settings} trip={lead.trip_id ? tripMap[lead.trip_id] ?? null : null} />
+              <LeadCard key={lead.id} lead={lead} settings={settings} trip={lead.trip_id ? tripMap[lead.trip_id] ?? null : null} trips={trips} />
             ))}
           </div>
         )}
@@ -658,12 +658,13 @@ function TripLibraryTab({ trips, leads, isLoading }: { trips: Trip[]; leads: Lea
 
 // ─── Lead Card ────────────────────────────────────────────────────────────────
 
-function LeadCard({ lead, settings, trip }: { lead: Lead; settings: HmsSettings | null; trip: Trip | null }) {
+function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSettings | null; trip: Trip | null; trips: Trip[] }) {
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [editNotes, setEditNotes] = useState(false)
   const [notes, setNotes] = useState(lead.notes ?? '')
   const [sending, setSending] = useState<string | null>(null)
+  const [showEdit, setShowEdit] = useState(false)
 
   const isGroup = lead.lead_type === 'group'
   const daysAgo = differenceInDays(new Date(), parseISO(lead.created_at))
@@ -757,6 +758,8 @@ function LeadCard({ lead, settings, trip }: { lead: Lead; settings: HmsSettings 
   }
 
   return (
+    <>
+    {showEdit && <EditLeadModal lead={lead} trips={trips} onClose={() => setShowEdit(false)} />}
     <div className={`border rounded-xl bg-white overflow-hidden ${lead.status === 'Lost' ? 'opacity-60' : 'border-gray-200'}`}>
       <div className="flex items-center gap-3 px-4 py-3">
         <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${isGroup ? 'bg-teal-100 text-teal-700' : 'bg-pink-100 text-pink-700'}`}>
@@ -914,13 +917,159 @@ function LeadCard({ lead, settings, trip }: { lead: Lead; settings: HmsSettings 
             )}
           </div>
 
-          <div className="flex justify-end pt-1">
+          <div className="flex justify-between pt-1">
+            <button onClick={() => setShowEdit(true)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-teal-600">
+              <Edit2 size={12} /> Edit lead
+            </button>
             <button onClick={deleteLead} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600">
               <Trash2 size={12} /> Delete lead
             </button>
           </div>
         </div>
       )}
+    </div>
+    </>
+  )
+}
+
+// ─── Edit Lead Modal ──────────────────────────────────────────────────────────
+
+function EditLeadModal({ lead, trips, onClose }: { lead: Lead; trips: Trip[]; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [leadType, setLeadType] = useState<'honeymoon' | 'group'>(lead.lead_type)
+  const [form, setForm] = useState({
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email ?? '',
+    wedding_date: lead.wedding_date ?? '',
+    pax: lead.pax,
+    destination: lead.destination,
+    source: lead.source,
+    notes: lead.notes ?? '',
+    trip_id: lead.trip_id ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const selectedTrip = trips.find(t => t.id === form.trip_id) ?? null
+
+  async function save() {
+    if (!form.name.trim()) return toast.error('Name required')
+    if (!form.phone.trim()) return toast.error('Phone required')
+    if (leadType === 'group' && !form.trip_id) return toast.error('Please select a trip')
+    setSaving(true)
+    const { error } = await supabase.from('hms_leads').update({
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim() || null,
+      wedding_date: leadType === 'honeymoon' ? (form.wedding_date || null) : null,
+      pax: Number(form.pax),
+      destination: leadType === 'group' && selectedTrip ? selectedTrip.destination : form.destination,
+      source: form.source,
+      notes: form.notes.trim() || null,
+      lead_type: leadType,
+      trip_id: leadType === 'group' ? form.trip_id : null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', lead.id)
+    setSaving(false)
+    if (error) return toast.error(error.message)
+    qc.invalidateQueries({ queryKey: ['hms_leads'] })
+    toast.success('Lead updated!')
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 overflow-y-auto py-8">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-bold text-slate-800">Edit Lead</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Lead type toggle */}
+          <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+            {(['honeymoon', 'group'] as const).map(t => (
+              <button key={t} onClick={() => setLeadType(t)}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${leadType === t ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+                {t === 'honeymoon' ? '🌺 Honeymoon' : '🌴 Group Trip'}
+              </button>
+            ))}
+          </div>
+
+          {/* Group: trip picker */}
+          {leadType === 'group' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Select Trip *</label>
+              {trips.length === 0 ? (
+                <p className="text-xs text-orange-500">No trips yet — go to Trip Library tab to create one first</p>
+              ) : (
+                <select value={form.trip_id} onChange={e => setForm(f => ({ ...f, trip_id: e.target.value }))} className={inp}>
+                  <option value="">Choose a trip…</option>
+                  {trips.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.departure_date ? `— ${format(parseISO(t.departure_date), 'd MMM yyyy')}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Full Name *</label>
+              <input value={form.name} onChange={set('name')} className={inp} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Phone / WhatsApp *</label>
+              <input value={form.phone} onChange={set('phone')} className={inp} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+              <input type="email" value={form.email} onChange={set('email')} className={inp} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Pax</label>
+              <input type="number" min={1} value={form.pax} onChange={set('pax')} className={inp} />
+            </div>
+            {leadType === 'honeymoon' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Wedding Date</label>
+                  <input type="date" value={form.wedding_date} onChange={set('wedding_date')} className={inp} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Destination</label>
+                  <select value={form.destination} onChange={set('destination')} className={inp}>
+                    {DESTINATIONS.map(d => <option key={d}>{d}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Source</label>
+              <select value={form.source} onChange={set('source')} className={inp}>
+                {SOURCES.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
+            <textarea value={form.notes} onChange={set('notes')} rows={2} className={`${inp} resize-none`} />
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end px-6 pb-6">
+          <button onClick={onClose} className="text-sm text-slate-500 px-4 py-2">Cancel</button>
+          <button onClick={save} disabled={saving} className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
