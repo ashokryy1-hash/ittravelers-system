@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Trash2, Copy, ChevronDown, ChevronUp, BookOpen, X, Check, Users, List, ChevronRight, Car, PlaneLanding, PlaneTakeoff, Search, Pencil } from 'lucide-react'
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, BookOpen, X, Check, Users, List, ChevronRight, Car, PlaneLanding, PlaneTakeoff, Search, Pencil, Globe } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
+import type { Tour as ExplorerTour } from '../../types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -436,6 +437,37 @@ function TourCard({ tour }: { tour: Tour }) {
 // ─── Activity Library Tab ─────────────────────────────────────────────────────
 
 function LibraryTab() {
+  const [libTab, setLibTab] = useState<'templates' | 'explorer'>('templates')
+
+  return (
+    <div>
+      {/* Sub-tabs */}
+      <div className="flex gap-1 mb-5 border-b border-gray-200">
+        <button
+          onClick={() => setLibTab('templates')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
+            libTab === 'templates' ? 'border-terracotta-500 text-terracotta-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <BookOpen size={14} /> Templates
+        </button>
+        <button
+          onClick={() => setLibTab('explorer')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
+            libTab === 'explorer' ? 'border-terracotta-500 text-terracotta-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Globe size={14} /> Explorer Tours
+        </button>
+      </div>
+
+      {libTab === 'templates' && <TemplatesTab />}
+      {libTab === 'explorer' && <ExplorerToursTab />}
+    </div>
+  )
+}
+
+function TemplatesTab() {
   const qc = useQueryClient()
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
@@ -617,6 +649,223 @@ function LibraryTab() {
                 </div>
               </>
             )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Explorer Tours Tab ───────────────────────────────────────────────────────
+
+interface ExplorerTourWithCities extends ExplorerTour {
+  cities: { name: string; destination: string }[]
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Romantic:    'bg-dusty-rose-100 text-dusty-rose-500 border-dusty-rose-200',
+  Adventure:   'bg-terracotta-100 text-terracotta-600 border-terracotta-200',
+  Cultural:    'bg-amber-50 text-amber-700 border-amber-200',
+  Nature:      'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Water:       'bg-sky-50 text-sky-700 border-sky-200',
+  Nightlife:   'bg-purple-50 text-purple-700 border-purple-200',
+  'Beach Club':'bg-cyan-50 text-cyan-700 border-cyan-200',
+}
+
+const CATEGORY_PHOTOS: Record<string, string> = {
+  Romantic:    'https://images.unsplash.com/photo-1604999333679-b86d54738315?w=600&q=80',
+  Adventure:   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80',
+  Cultural:    'https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=600&q=80',
+  Nature:      'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=600&q=80',
+  Water:       'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&q=80',
+  Nightlife:   'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
+  'Beach Club':'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
+}
+
+const ALL_CATEGORIES = ['All', 'Romantic', 'Adventure', 'Cultural', 'Nature', 'Water', 'Nightlife', 'Beach Club']
+
+function ExplorerToursTab() {
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('All')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const { data: tours = [], isLoading } = useQuery<ExplorerTourWithCities[]>({
+    queryKey: ['explorer_tours_hms'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('explorer_tours')
+        .select(`
+          *,
+          tour_cities(
+            cities(name, destinations(name))
+          )
+        `)
+        .order('sort_order')
+      if (error) throw error
+      return (data ?? []).map((t: any) => ({
+        ...t,
+        cities: (t.tour_cities ?? []).map((tc: any) => ({
+          name: tc.cities?.name ?? '',
+          destination: tc.cities?.destinations?.name ?? '',
+        })).filter((c: any) => c.name),
+      }))
+    },
+  })
+
+  const filtered = tours.filter(t => {
+    const matchCat = category === 'All' || t.category === category
+    const matchSearch = !search.trim() || t.name.toLowerCase().includes(search.toLowerCase())
+    return matchCat && matchSearch
+  })
+
+  // Group by destination
+  const grouped = filtered.reduce<Record<string, ExplorerTourWithCities[]>>((acc, t) => {
+    const dest = t.cities[0]?.destination || 'Other'
+    if (!acc[dest]) acc[dest] = []
+    acc[dest].push(t)
+    return acc
+  }, {})
+
+  if (isLoading) return <p className="text-sm text-slate-400">Loading tours…</p>
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search tours…"
+            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400"
+          />
+        </div>
+        {/* Category filter */}
+        <div className="flex flex-wrap gap-1.5">
+          {ALL_CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                category === cat
+                  ? 'bg-terracotta-600 text-white border-terracotta-600'
+                  : 'bg-white text-slate-500 border-gray-300 hover:border-terracotta-400'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-slate-400 text-center py-10">No tours match your filter.</p>
+      )}
+
+      <div className="space-y-8">
+        {Object.entries(grouped).map(([destination, destTours]) => (
+          <div key={destination}>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{destination}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {destTours.map(tour => {
+                const expanded = expandedId === tour.id
+                const photo = tour.cover_image_url || CATEGORY_PHOTOS[tour.category]
+                const tiktokLinks = [tour.tiktok_1, tour.tiktok_2, tour.tiktok_3, tour.tiktok_4].filter(Boolean)
+                const hasDetails = (tour.inclusions?.length > 0) || (tour.exclusions?.length > 0)
+                const cityNames = tour.cities.map(c => c.name).join(', ')
+
+                return (
+                  <div key={tour.id} className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+                    {/* Cover */}
+                    <div className="relative h-36 w-full overflow-hidden">
+                      <img src={photo} alt={tour.name} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                      <span className={`absolute top-2 left-2 text-xs font-medium px-2.5 py-0.5 rounded-full border ${CATEGORY_COLORS[tour.category] ?? 'bg-ivory-100 text-slate-500 border-ivory-200'}`}>
+                        {tour.category}
+                      </span>
+                      {cityNames && (
+                        <span className="absolute bottom-2 left-3 text-xs text-white/80 font-medium">{cityNames}</span>
+                      )}
+                    </div>
+
+                    <div className="p-3">
+                      <p className="font-semibold text-slate-800 text-sm">{tour.name}</p>
+                      {tour.description && (
+                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{tour.description}</p>
+                      )}
+
+                      {/* TikTok links */}
+                      {tiktokLinks.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {tiktokLinks.map((url, i) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-slate-500 border border-slate-200 px-2.5 py-1 rounded-full hover:bg-slate-50 transition-colors"
+                            >
+                              TikTok {tiktokLinks.length > 1 ? i + 1 : ''}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Tour link */}
+                      {tour.tour_link_url && (
+                        <a
+                          href={tour.tour_link_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block mt-2 text-xs text-terracotta-600 hover:underline"
+                        >
+                          View tour page →
+                        </a>
+                      )}
+
+                      {/* Inclusions / Exclusions toggle */}
+                      {hasDetails && (
+                        <button
+                          onClick={() => setExpandedId(expanded ? null : tour.id)}
+                          className="mt-2 flex items-center gap-1 text-xs text-terracotta-600 hover:text-terracotta-700 font-medium"
+                        >
+                          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          {expanded ? 'Hide details' : 'Show inclusions / exclusions'}
+                        </button>
+                      )}
+
+                      {expanded && (
+                        <div className="mt-3 space-y-2">
+                          {tour.inclusions?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Included</p>
+                              {tour.inclusions.map((item, i) => (
+                                <div key={i} className="flex items-start gap-1.5 mb-0.5">
+                                  <Check size={11} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                                  <span className="text-xs text-slate-600">{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {tour.exclusions?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Not Included</p>
+                              {tour.exclusions.map((item, i) => (
+                                <div key={i} className="flex items-start gap-1.5 mb-0.5">
+                                  <X size={11} className="text-red-400 mt-0.5 flex-shrink-0" />
+                                  <span className="text-xs text-slate-600">{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         ))}
       </div>
