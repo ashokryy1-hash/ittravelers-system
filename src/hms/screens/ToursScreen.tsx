@@ -387,41 +387,67 @@ function TourCard({ tour }: { tour: Tour }) {
                 <div className="text-xs font-bold text-terracotta-700 uppercase tracking-wide mb-1">
                   🌴 {formatDay(day.date, i + 1)}
                 </div>
-                <div className="space-y-0.5 pl-2">
-                  {acts.map(act => {
-                    const p = parseActivity(act.description)
-                    if (p.type === 'transfer') return (
-                      <div key={act.id} className="flex items-center gap-1.5 text-sm text-slate-600 flex-wrap">
-                        <span className="font-mono text-slate-400 text-xs">{act.time}</span>
-                        <Car size={12} className="text-slate-400" />
-                        <span>{p.from} → {p.to}</span>
-                        {p.flight && <span className="text-xs bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">✈ {p.flight}</span>}
-                      </div>
-                    )
-                    if (p.type === 'airport-pickup') return (
-                      <div key={act.id} className="flex items-center gap-1.5 text-sm text-blue-700 flex-wrap">
-                        <span className="font-mono text-slate-400 text-xs">{act.time}</span>
-                        <PlaneLanding size={13} className="text-blue-500" />
-                        <span>Airport Pickup → {p.to}</span>
-                        {p.flight && <span className="text-xs bg-blue-50 border border-blue-200 text-blue-700 rounded px-1.5 py-0.5 font-medium">{p.flight}</span>}
-                      </div>
-                    )
-                    if (p.type === 'airport-dropoff') return (
-                      <div key={act.id} className="flex items-center gap-1.5 text-sm text-purple-700 flex-wrap">
-                        <span className="font-mono text-slate-400 text-xs">{act.time}</span>
-                        <PlaneTakeoff size={13} className="text-purple-500" />
-                        <span>Airport Drop-off from {p.from}</span>
-                        {p.flight && <span className="text-xs bg-purple-50 border border-purple-200 text-purple-700 rounded px-1.5 py-0.5 font-medium">{p.flight}</span>}
-                      </div>
-                    )
+                <div className="space-y-2 pl-2">
+                  {(() => {
+                    const stops = acts.filter(a => parseActivity(a.description).type === 'stop')
+                    const transfers = acts.filter(a => parseActivity(a.description).type !== 'stop')
                     return (
-                      <div key={act.id} className="text-sm text-slate-700">
-                        <span className="text-slate-400 font-mono mr-2 text-xs">{act.time}</span>
-                        {p.text}
-                      </div>
+                      <>
+                        {stops.length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-1">🏖 Tour Activities</div>
+                            <div className="space-y-0.5">
+                              {stops.map(act => {
+                                const p = parseActivity(act.description)
+                                return (
+                                  <div key={act.id} className="flex items-start gap-1.5 text-sm text-slate-700">
+                                    <span className="text-slate-400 mt-px">•</span>
+                                    <span>{p.text}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {transfers.length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-1">🚗 Transfers</div>
+                            <div className="space-y-0.5">
+                              {transfers.map(act => {
+                                const p = parseActivity(act.description)
+                                if (p.type === 'transfer') return (
+                                  <div key={act.id} className="flex items-center gap-1.5 text-sm text-slate-600 flex-wrap">
+                                    <span className="font-mono text-slate-400 text-xs">{act.time}</span>
+                                    <Car size={12} className="text-slate-400" />
+                                    <span>{p.from} → {p.to}</span>
+                                    {p.flight && <span className="text-xs bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">✈ {p.flight}</span>}
+                                  </div>
+                                )
+                                if (p.type === 'airport-pickup') return (
+                                  <div key={act.id} className="flex items-center gap-1.5 text-sm text-blue-700 flex-wrap">
+                                    <span className="font-mono text-slate-400 text-xs">{act.time}</span>
+                                    <PlaneLanding size={13} className="text-blue-500" />
+                                    <span>Airport Pickup → {p.to}</span>
+                                    {p.flight && <span className="text-xs bg-blue-50 border border-blue-200 text-blue-700 rounded px-1.5 py-0.5 font-medium">{p.flight}</span>}
+                                  </div>
+                                )
+                                if (p.type === 'airport-dropoff') return (
+                                  <div key={act.id} className="flex items-center gap-1.5 text-sm text-purple-700 flex-wrap">
+                                    <span className="font-mono text-slate-400 text-xs">{act.time}</span>
+                                    <PlaneTakeoff size={13} className="text-purple-500" />
+                                    <span>Airport Drop-off from {p.from}</span>
+                                    {p.flight && <span className="text-xs bg-purple-50 border border-purple-200 text-purple-700 rounded px-1.5 py-0.5 font-medium">{p.flight}</span>}
+                                  </div>
+                                )
+                                return null
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {!acts.length && <div className="text-xs text-slate-400">No activities</div>}
+                      </>
                     )
-                  })}
-                  {!acts.length && <div className="text-xs text-slate-400">No activities</div>}
+                  })()}
                 </div>
               </div>
             )
@@ -1055,6 +1081,12 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
     }))
   }
 
+  function addTransfer(dayIdx: number) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: [...day.activities, { time: '', description: '', type: 'transfer' as const, from: '', to: '', flight: '' }],
+    }))
+  }
+
   function removeActivity(dayIdx: number, actIdx: number) {
     setDays(d => d.map((day, j) => j !== dayIdx ? day : {
       ...day, activities: day.activities.filter((_, k) => k !== actIdx),
@@ -1222,111 +1254,130 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
                 />
               )}
 
-              <div className="space-y-3">
-                {day.activities.map((act, actIdx) => {
-                  const cfg = TYPE_CONFIG[act.type]
-                  return (
-                    <div key={actIdx} className="space-y-1.5">
-                      <div className="flex gap-2 items-center">
-                        <button type="button" onClick={() => cycleActivityType(dayIdx, actIdx)}
-                          className={`flex-shrink-0 flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ${cfg.bg}`}>
-                          {cfg.label}
-                        </button>
-                        <input value={act.time} onChange={e => setActivity(dayIdx, actIdx, 'time', e.target.value)}
-                          className={`${inp} w-24 flex-shrink-0`} placeholder="09:00" />
-                        <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0 ml-auto">
+              <div className="space-y-4">
+                {/* ── Tour Activities ── */}
+                <div>
+                  <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">🏖 Tour Activities</div>
+                  <div className="space-y-2">
+                    {day.activities.map((act, actIdx) => act.type !== 'stop' ? null : (
+                      <div key={actIdx} className="flex gap-2 items-center">
+                        <input value={act.description} onChange={e => setActivity(dayIdx, actIdx, 'description', e.target.value)}
+                          className={inp} placeholder="Activity or stop description…" />
+                        <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0">
                           <X size={14} />
                         </button>
                       </div>
+                    ))}
+                    <button onClick={() => addActivity(dayIdx)} className="text-xs text-terracotta-600 hover:underline">+ Add activity</button>
+                  </div>
+                </div>
 
-                      {act.type === 'stop' && (
-                        <input value={act.description} onChange={e => setActivity(dayIdx, actIdx, 'description', e.target.value)}
-                          className={inp} placeholder="Activity / hotel check-in…" />
-                      )}
-
-                      {act.type === 'transfer' && (
-                        <div className="space-y-1.5 pl-1">
+                {/* ── Transfers ── */}
+                <div>
+                  <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">🚗 Transfers</div>
+                  <div className="space-y-3">
+                    {day.activities.map((act, actIdx) => {
+                      if (act.type === 'stop') return null
+                      const cfg = TYPE_CONFIG[act.type]
+                      return (
+                        <div key={actIdx} className="space-y-1.5">
                           <div className="flex gap-2 items-center">
-                            <div className="flex-1">
-                              <input value={act.from ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
-                                className={inp} placeholder="From" list={`e-from-${dayIdx}-${actIdx}`} />
-                              <datalist id={`e-from-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
-                            </div>
-                            <span className="text-slate-400 text-xs flex-shrink-0">→</span>
-                            <div className="flex-1">
-                              <input value={act.to ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
-                                className={inp} placeholder="To" list={`e-to-${dayIdx}-${actIdx}`} />
-                              <datalist id={`e-to-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
-                            </div>
+                            <button type="button" onClick={() => cycleActivityType(dayIdx, actIdx)}
+                              className={`flex-shrink-0 flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ${cfg.bg}`}>
+                              {cfg.label}
+                            </button>
+                            <input value={act.time} onChange={e => setActivity(dayIdx, actIdx, 'time', e.target.value)}
+                              className={`${inp} w-24 flex-shrink-0`} placeholder="09:00" />
+                            <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0 ml-auto">
+                              <X size={14} />
+                            </button>
                           </div>
-                          {confirmedHotels.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {confirmedHotels.map(h => (
-                                <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
-                                  className="text-[10px] bg-slate-100 hover:bg-terracotta-100 text-slate-600 hover:text-terracotta-800 border border-slate-200 rounded px-1.5 py-0.5">→ {h}</button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
 
-                      {act.type === 'airport-pickup' && (
-                        <div className="space-y-1.5 pl-1">
-                          <div className="flex gap-2">
-                            <div className="flex-1">
-                              <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">✈️ Arrival Flight</label>
-                              <input value={act.flight ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
-                                className={inp} placeholder="e.g. MS985" />
-                            </div>
-                            <div className="flex-1">
-                              <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">Drop to hotel</label>
-                              <input value={act.to ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
-                                className={inp} placeholder="Hotel / destination" list={`e-pickup-to-${dayIdx}-${actIdx}`} />
-                              <datalist id={`e-pickup-to-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
-                            </div>
-                          </div>
-                          {confirmedHotels.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
-                              {confirmedHotels.map(h => (
-                                <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
-                                  className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5">{h}</button>
-                              ))}
+                          {act.type === 'transfer' && (
+                            <div className="space-y-1.5 pl-1">
+                              <div className="flex gap-2 items-center">
+                                <div className="flex-1">
+                                  <input value={act.from ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                                    className={inp} placeholder="From" list={`e-from-${dayIdx}-${actIdx}`} />
+                                  <datalist id={`e-from-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                                </div>
+                                <span className="text-slate-400 text-xs flex-shrink-0">→</span>
+                                <div className="flex-1">
+                                  <input value={act.to ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                                    className={inp} placeholder="To" list={`e-to-${dayIdx}-${actIdx}`} />
+                                  <datalist id={`e-to-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                                </div>
+                              </div>
+                              {confirmedHotels.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {confirmedHotels.map(h => (
+                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
+                                      className="text-[10px] bg-slate-100 hover:bg-terracotta-100 text-slate-600 hover:text-terracotta-800 border border-slate-200 rounded px-1.5 py-0.5">→ {h}</button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
-                        </div>
-                      )}
 
-                      {act.type === 'airport-dropoff' && (
-                        <div className="space-y-1.5 pl-1">
-                          <div className="flex gap-2">
-                            <div className="flex-1">
-                              <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">Pick up from hotel</label>
-                              <input value={act.from ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
-                                className={inp} placeholder="Hotel / pickup location" list={`e-dropoff-from-${dayIdx}-${actIdx}`} />
-                              <datalist id={`e-dropoff-from-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                          {act.type === 'airport-pickup' && (
+                            <div className="space-y-1.5 pl-1">
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">✈️ Arrival Flight</label>
+                                  <input value={act.flight ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                                    className={inp} placeholder="e.g. MS985" />
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">Drop to hotel</label>
+                                  <input value={act.to ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                                    className={inp} placeholder="Hotel / destination" list={`e-pickup-to-${dayIdx}-${actIdx}`} />
+                                  <datalist id={`e-pickup-to-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                                </div>
+                              </div>
+                              {confirmedHotels.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
+                                  {confirmedHotels.map(h => (
+                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
+                                      className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5">{h}</button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            <div className="flex-1">
-                              <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">🛫 Departure Flight</label>
-                              <input value={act.flight ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
-                                className={inp} placeholder="e.g. MS986" />
-                            </div>
-                          </div>
-                          {confirmedHotels.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
-                              {confirmedHotels.map(h => (
-                                <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'from', h)}
-                                  className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5">{h}</button>
-                              ))}
+                          )}
+
+                          {act.type === 'airport-dropoff' && (
+                            <div className="space-y-1.5 pl-1">
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">Pick up from hotel</label>
+                                  <input value={act.from ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                                    className={inp} placeholder="Hotel / pickup location" list={`e-dropoff-from-${dayIdx}-${actIdx}`} />
+                                  <datalist id={`e-dropoff-from-${dayIdx}-${actIdx}`}>{hotelOptions.map(h => <option key={h} value={h} />)}</datalist>
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">🛫 Departure Flight</label>
+                                  <input value={act.flight ?? ''} onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                                    className={inp} placeholder="e.g. MS986" />
+                                </div>
+                              </div>
+                              {confirmedHotels.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
+                                  {confirmedHotels.map(h => (
+                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'from', h)}
+                                      className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5">{h}</button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-                <button onClick={() => addActivity(dayIdx)} className="text-xs text-terracotta-600 hover:underline">+ Add activity</button>
+                      )
+                    })}
+                    <button onClick={() => addTransfer(dayIdx)} className="text-xs text-slate-500 hover:text-slate-700 hover:underline">+ Add transfer</button>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
@@ -1487,6 +1538,12 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
   function addActivity(dayIdx: number) {
     setDays(d => d.map((day, j) => j !== dayIdx ? day : {
       ...day, activities: [...day.activities, { time: '', description: '', type: 'stop' as const }],
+    }))
+  }
+
+  function addTransfer(dayIdx: number) {
+    setDays(d => d.map((day, j) => j !== dayIdx ? day : {
+      ...day, activities: [...day.activities, { time: '', description: '', type: 'transfer' as const, from: '', to: '', flight: '' }],
     }))
   }
 
@@ -1719,167 +1776,187 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
                     />
                   )}
 
-                  <div className="space-y-3">
-                    {day.activities.map((act, actIdx) => {
-                      const cfg = TYPE_CONFIG[act.type]
-                      return (
-                        <div key={actIdx} className="space-y-1.5">
-                          <div className="flex gap-2 items-center">
-                            <button
-                              type="button"
-                              onClick={() => cycleActivityType(dayIdx, actIdx)}
-                              className={`flex-shrink-0 flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ${cfg.bg}`}
-                            >
-                              {cfg.label}
-                            </button>
-                            <input
-                              value={act.time}
-                              onChange={e => setActivity(dayIdx, actIdx, 'time', e.target.value)}
-                              className={`${inp} w-24 flex-shrink-0`}
-                              placeholder="09:00"
-                            />
-                            <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0 ml-auto">
-                              <X size={14} />
-                            </button>
-                          </div>
-
-                          {act.type === 'stop' && (
+                  <div className="space-y-4">
+                    {/* ── Tour Activities ── */}
+                    <div>
+                      <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">🏖 Tour Activities</div>
+                      <div className="space-y-2">
+                        {day.activities.map((act, actIdx) => act.type !== 'stop' ? null : (
+                          <div key={actIdx} className="flex gap-2 items-center">
                             <input
                               value={act.description}
                               onChange={e => setActivity(dayIdx, actIdx, 'description', e.target.value)}
                               className={inp}
-                              placeholder="Activity / hotel check-in…"
+                              placeholder="Activity or stop description…"
                             />
-                          )}
+                            <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0">
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        <button onClick={() => addActivity(dayIdx)} className="text-xs text-terracotta-600 hover:underline">
+                          + Add activity
+                        </button>
+                      </div>
+                    </div>
 
-                          {act.type === 'transfer' && (
-                            <div className="space-y-1.5 pl-1">
+                    {/* ── Transfers ── */}
+                    <div>
+                      <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">🚗 Transfers</div>
+                      <div className="space-y-3">
+                        {day.activities.map((act, actIdx) => {
+                          if (act.type === 'stop') return null
+                          const cfg = TYPE_CONFIG[act.type]
+                          return (
+                            <div key={actIdx} className="space-y-1.5">
                               <div className="flex gap-2 items-center">
-                                <div className="flex-1">
-                                  <input
-                                    value={act.from ?? ''}
-                                    onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
-                                    className={inp}
-                                    placeholder="From hotel / location"
-                                    list={`from-${dayIdx}-${actIdx}`}
-                                  />
-                                  <datalist id={`from-${dayIdx}-${actIdx}`}>
-                                    {hotelOptions.map(h => <option key={h} value={h} />)}
-                                  </datalist>
-                                </div>
-                                <span className="text-slate-400 text-xs flex-shrink-0">→</span>
-                                <div className="flex-1">
-                                  <input
-                                    value={act.to ?? ''}
-                                    onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
-                                    className={inp}
-                                    placeholder="To hotel / location"
-                                    list={`to-${dayIdx}-${actIdx}`}
-                                  />
-                                  <datalist id={`to-${dayIdx}-${actIdx}`}>
-                                    {hotelOptions.map(h => <option key={h} value={h} />)}
-                                  </datalist>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => cycleActivityType(dayIdx, actIdx)}
+                                  className={`flex-shrink-0 flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ${cfg.bg}`}
+                                >
+                                  {cfg.label}
+                                </button>
+                                <input
+                                  value={act.time}
+                                  onChange={e => setActivity(dayIdx, actIdx, 'time', e.target.value)}
+                                  className={`${inp} w-24 flex-shrink-0`}
+                                  placeholder="09:00"
+                                />
+                                <button onClick={() => removeActivity(dayIdx, actIdx)} className="text-slate-300 hover:text-red-400 flex-shrink-0 ml-auto">
+                                  <X size={14} />
+                                </button>
                               </div>
-                              {/* Confirmed hotel chips for quick-fill */}
-                              {confirmedHotels.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {confirmedHotels.map(h => (
-                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
-                                      className="text-[10px] bg-slate-100 hover:bg-terracotta-100 text-slate-600 hover:text-terracotta-800 border border-slate-200 rounded px-1.5 py-0.5 transition-colors">
-                                      → {h}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
 
-                          {act.type === 'airport-pickup' && (
-                            <div className="space-y-1.5 pl-1">
-                              <div className="flex gap-2">
-                                <div className="flex-1">
-                                  <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">✈️ Arrival Flight</label>
-                                  <input
-                                    value={act.flight ?? ''}
-                                    onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
-                                    className={inp}
-                                    placeholder="e.g. MS985"
-                                  />
-                                </div>
-                                <div className="flex-1">
-                                  <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">Drop to hotel</label>
-                                  <input
-                                    value={act.to ?? ''}
-                                    onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
-                                    className={inp}
-                                    placeholder="Hotel / destination"
-                                    list={`pickup-to-${dayIdx}-${actIdx}`}
-                                  />
-                                  <datalist id={`pickup-to-${dayIdx}-${actIdx}`}>
-                                    {hotelOptions.map(h => <option key={h} value={h} />)}
-                                  </datalist>
-                                </div>
-                              </div>
-                              {confirmedHotels.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
-                                  {confirmedHotels.map(h => (
-                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
-                                      className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 transition-colors">
-                                      {h}
-                                    </button>
-                                  ))}
+                              {act.type === 'transfer' && (
+                                <div className="space-y-1.5 pl-1">
+                                  <div className="flex gap-2 items-center">
+                                    <div className="flex-1">
+                                      <input
+                                        value={act.from ?? ''}
+                                        onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                                        className={inp}
+                                        placeholder="From hotel / location"
+                                        list={`from-${dayIdx}-${actIdx}`}
+                                      />
+                                      <datalist id={`from-${dayIdx}-${actIdx}`}>
+                                        {hotelOptions.map(h => <option key={h} value={h} />)}
+                                      </datalist>
+                                    </div>
+                                    <span className="text-slate-400 text-xs flex-shrink-0">→</span>
+                                    <div className="flex-1">
+                                      <input
+                                        value={act.to ?? ''}
+                                        onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                                        className={inp}
+                                        placeholder="To hotel / location"
+                                        list={`to-${dayIdx}-${actIdx}`}
+                                      />
+                                      <datalist id={`to-${dayIdx}-${actIdx}`}>
+                                        {hotelOptions.map(h => <option key={h} value={h} />)}
+                                      </datalist>
+                                    </div>
+                                  </div>
+                                  {confirmedHotels.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {confirmedHotels.map(h => (
+                                        <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
+                                          className="text-[10px] bg-slate-100 hover:bg-terracotta-100 text-slate-600 hover:text-terracotta-800 border border-slate-200 rounded px-1.5 py-0.5 transition-colors">
+                                          → {h}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
-                            </div>
-                          )}
 
-                          {act.type === 'airport-dropoff' && (
-                            <div className="space-y-1.5 pl-1">
-                              <div className="flex gap-2">
-                                <div className="flex-1">
-                                  <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">Pick up from hotel</label>
-                                  <input
-                                    value={act.from ?? ''}
-                                    onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
-                                    className={inp}
-                                    placeholder="Hotel / pickup location"
-                                    list={`dropoff-from-${dayIdx}-${actIdx}`}
-                                  />
-                                  <datalist id={`dropoff-from-${dayIdx}-${actIdx}`}>
-                                    {hotelOptions.map(h => <option key={h} value={h} />)}
-                                  </datalist>
+                              {act.type === 'airport-pickup' && (
+                                <div className="space-y-1.5 pl-1">
+                                  <div className="flex gap-2">
+                                    <div className="flex-1">
+                                      <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">✈️ Arrival Flight</label>
+                                      <input
+                                        value={act.flight ?? ''}
+                                        onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                                        className={inp}
+                                        placeholder="e.g. MS985"
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="text-[10px] text-blue-600 font-medium mb-0.5 block">Drop to hotel</label>
+                                      <input
+                                        value={act.to ?? ''}
+                                        onChange={e => setActivity(dayIdx, actIdx, 'to', e.target.value)}
+                                        className={inp}
+                                        placeholder="Hotel / destination"
+                                        list={`pickup-to-${dayIdx}-${actIdx}`}
+                                      />
+                                      <datalist id={`pickup-to-${dayIdx}-${actIdx}`}>
+                                        {hotelOptions.map(h => <option key={h} value={h} />)}
+                                      </datalist>
+                                    </div>
+                                  </div>
+                                  {confirmedHotels.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
+                                      {confirmedHotels.map(h => (
+                                        <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
+                                          className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 transition-colors">
+                                          {h}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="flex-1">
-                                  <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">🛫 Departure Flight</label>
-                                  <input
-                                    value={act.flight ?? ''}
-                                    onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
-                                    className={inp}
-                                    placeholder="e.g. MS986"
-                                  />
-                                </div>
-                              </div>
-                              {confirmedHotels.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
-                                  {confirmedHotels.map(h => (
-                                    <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'from', h)}
-                                      className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5 transition-colors">
-                                      {h}
-                                    </button>
-                                  ))}
+                              )}
+
+                              {act.type === 'airport-dropoff' && (
+                                <div className="space-y-1.5 pl-1">
+                                  <div className="flex gap-2">
+                                    <div className="flex-1">
+                                      <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">Pick up from hotel</label>
+                                      <input
+                                        value={act.from ?? ''}
+                                        onChange={e => setActivity(dayIdx, actIdx, 'from', e.target.value)}
+                                        className={inp}
+                                        placeholder="Hotel / pickup location"
+                                        list={`dropoff-from-${dayIdx}-${actIdx}`}
+                                      />
+                                      <datalist id={`dropoff-from-${dayIdx}-${actIdx}`}>
+                                        {hotelOptions.map(h => <option key={h} value={h} />)}
+                                      </datalist>
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="text-[10px] text-purple-600 font-medium mb-0.5 block">🛫 Departure Flight</label>
+                                      <input
+                                        value={act.flight ?? ''}
+                                        onChange={e => setActivity(dayIdx, actIdx, 'flight', e.target.value)}
+                                        className={inp}
+                                        placeholder="e.g. MS986"
+                                      />
+                                    </div>
+                                  </div>
+                                  {confirmedHotels.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      <span className="text-[10px] text-slate-400 self-center">Quick fill:</span>
+                                      {confirmedHotels.map(h => (
+                                        <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'from', h)}
+                                          className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5 transition-colors">
+                                          {h}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                    <button onClick={() => addActivity(dayIdx)} className="text-xs text-terracotta-600 hover:underline">
-                      + Add activity
-                    </button>
+                          )
+                        })}
+                        <button onClick={() => addTransfer(dayIdx)} className="text-xs text-slate-500 hover:text-slate-700 hover:underline">
+                          + Add transfer
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
