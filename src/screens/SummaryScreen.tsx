@@ -22,7 +22,7 @@ function formatDate(d: string) {
 function buildSummaryText(
   grouped: Record<string, SessionSelection[]>,
   clientName: string,
-  hotelDates: Record<string, { checkIn: string; checkOut: string }>,
+  hotelDates: Record<string, { checkIn: string; checkOut: string; roomType: string }>,
 ): string {
   const lines: string[] = ['ITTravelers Trip Explorer — Session Summary', '']
   if (clientName) { lines.push(`Client: ${clientName}`); lines.push('') }
@@ -35,10 +35,10 @@ function buildSummaryText(
       lines.push('Hotels:')
       hotels.forEach(h => {
         const d = hotelDates[h.id]
-        const dateStr = d?.checkIn && d?.checkOut
-          ? ` — Check-in: ${formatDate(d.checkIn)}, Check-out: ${formatDate(d.checkOut)}`
-          : ''
-        lines.push(`  - ${h.name}${dateStr}`)
+        const parts: string[] = []
+        if (d?.checkIn && d?.checkOut) parts.push(`Check-in: ${formatDate(d.checkIn)}, Check-out: ${formatDate(d.checkOut)}`)
+        if (d?.roomType) parts.push(`Room: ${d.roomType}`)
+        lines.push(`  - ${h.name}${parts.length ? ' — ' + parts.join(' | ') : ''}`)
       })
     }
     if (tours.length > 0) {
@@ -151,16 +151,15 @@ export default function SummaryScreen() {
                       <div>
                         <p className="font-body text-xs uppercase tracking-wider text-gray-400 mb-1.5">Hotels</p>
                         {items.filter(i => i.type === 'hotel').map(item => {
-                          const dates = hotelDates[item.id] ?? { checkIn: '', checkOut: '' }
+                          const dates = hotelDates[item.id] ?? { checkIn: '', checkOut: '', roomType: '' }
                           return (
-                            <div key={item.id} className="py-3 px-4 bg-white rounded-xl border border-ivory-200 mb-2">
+                            <div key={item.id} className="py-3 px-4 bg-white rounded-xl border border-ivory-200 mb-2 space-y-2">
                               <p className="font-body font-medium text-sm text-gray-800">{item.name}</p>
-                              {item.details && (
-                                <p className="font-body text-xs text-gray-400 mt-0.5 mb-3 line-clamp-1">{item.details}</p>
-                              )}
-                              <div className="flex items-center gap-3 mt-2">
+
+                              {/* Check-in / Check-out */}
+                              <div className="flex items-center gap-3">
                                 <Calendar size={14} className="text-terracotta-400 shrink-0" />
-                                <div className="flex items-center gap-2 flex-1 flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <div className="flex items-center gap-1.5">
                                     <span className="font-body text-xs text-gray-400">Check-in</span>
                                     <input
@@ -183,6 +182,23 @@ export default function SummaryScreen() {
                                   </div>
                                 </div>
                               </div>
+
+                              {/* Room type */}
+                              {item.roomTypes && item.roomTypes.length > 0 && (
+                                <div className="flex items-center gap-3">
+                                  <span className="font-body text-xs text-gray-400 shrink-0 ml-[22px]">Room type</span>
+                                  <select
+                                    value={dates.roomType}
+                                    onChange={e => setHotelDates(item.id, { ...dates, roomType: e.target.value })}
+                                    className="border border-ivory-300 rounded-lg px-2 py-1 font-body text-xs text-gray-700 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 transition bg-white"
+                                  >
+                                    <option value="">— Select room type —</option>
+                                    {item.roomTypes.map(rt => (
+                                      <option key={rt} value={rt}>{rt}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
                             </div>
                           )
                         })}

@@ -58,4 +58,5 @@ export interface SessionSelection {
   name: string
   cityName: string
   details?: string
+  roomTypes?: string[]
 }

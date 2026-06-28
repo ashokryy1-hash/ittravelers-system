@@ -4,6 +4,7 @@ import type { Hotel, Tour, City, SessionSelection } from '../types'
 interface HotelDates {
   checkIn: string
   checkOut: string
+  roomType: string
 }
 
 interface SessionContextValue {
@@ -35,6 +36,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         name: hotel.name,
         cityName: city.name,
         details: hotel.room_types.join(', '),
+        roomTypes: hotel.room_types,
       }]
     })
   }
