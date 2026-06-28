@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { Destination } from '../types'
+import { useBasePath } from '../context/TripExplorerContext'
 
 const DESTINATIONS = [
   {
@@ -27,6 +28,7 @@ const DESTINATIONS = [
 
 export default function HomeScreen() {
   const navigate = useNavigate()
+  const basePath = useBasePath()
 
   const { data: destinations } = useQuery<Destination[]>({
     queryKey: ['destinations'],
@@ -62,7 +64,7 @@ export default function HomeScreen() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Bali */}
           <button
-            onClick={() => navigate('/bali')}
+            onClick={() => navigate(`${basePath}/bali`)}
             className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 aspect-[3/4] cursor-pointer"
           >
             <img
@@ -99,7 +101,7 @@ export default function HomeScreen() {
 
           {/* Vietnam */}
           <button
-            onClick={() => navigate('/vietnam')}
+            onClick={() => navigate(`${basePath}/vietnam`)}
             className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 aspect-[3/4] cursor-pointer"
           >
             <img
@@ -119,7 +121,7 @@ export default function HomeScreen() {
 
       <footer className="text-center pb-8">
         <button
-          onClick={() => navigate('/admin')}
+          onClick={() => navigate(`${basePath}/admin`)}
           className="font-body text-xs text-gray-300 hover:text-gray-500 transition-colors uppercase tracking-widest"
         >
           Admin

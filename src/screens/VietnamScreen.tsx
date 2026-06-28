@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSession } from '../context/SessionContext'
+import { useBasePath } from '../context/TripExplorerContext'
 import SelectionCounter from '../components/SelectionCounter'
 import type { Destination, City } from '../types'
 
 export default function VietnamScreen() {
   const navigate = useNavigate()
+  const basePath = useBasePath()
   const { totalCount } = useSession()
 
   const { data: destination, isLoading: loadingDest } = useQuery<Destination | null>({
@@ -50,7 +52,7 @@ export default function VietnamScreen() {
       <div className="min-h-screen bg-ivory-100 flex items-center justify-center">
         <div className="text-center">
           <p className="font-body text-gray-500 mb-4">Vietnam not found. Have you run the SQL migration?</p>
-          <button onClick={() => navigate('/')} className="text-terracotta-500 underline">Go back</button>
+          <button onClick={() => navigate(`${basePath}/`)} className="text-terracotta-500 underline">Go back</button>
         </div>
       </div>
     )
@@ -69,7 +71,7 @@ export default function VietnamScreen() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-terracotta-900/70 via-terracotta-800/20 to-transparent" />
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(`${basePath}/`)}
           className="absolute top-4 left-4 flex items-center gap-2 text-white/90 hover:text-white font-body text-sm transition-colors bg-black/20 hover:bg-black/30 px-3 py-2 rounded-full"
         >
           <ArrowLeft size={16} />
@@ -77,7 +79,7 @@ export default function VietnamScreen() {
         </button>
         {totalCount > 0 && (
           <button
-            onClick={() => navigate('/summary')}
+            onClick={() => navigate(`${basePath}/summary`)}
             className="absolute top-4 right-4 bg-terracotta-500 hover:bg-terracotta-600 text-white px-4 py-2 rounded-full text-sm font-body font-medium shadow-lg transition-colors"
           >
             {totalCount} selected
@@ -119,7 +121,7 @@ export default function VietnamScreen() {
             {(cities ?? []).map((city) => (
               <button
                 key={city.id}
-                onClick={() => navigate(`/vietnam/${city.id}`)}
+                onClick={() => navigate(`${basePath}/vietnam/${city.id}`)}
                 className="group text-left rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all relative"
               >
                 {city.cover_image_url ? (

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { SessionProvider } from './context/SessionContext'
+import { TripExplorerProvider } from './context/TripExplorerContext'
 import HomeScreen from './screens/HomeScreen'
 import DestinationScreen from './screens/DestinationScreen'
 import VietnamScreen from './screens/VietnamScreen'
@@ -22,6 +23,7 @@ import SettingsScreen from './hms/screens/SettingsScreen'
 import SalesPortalScreen from './hms/screens/SalesPortalScreen'
 import ToursScreen from './hms/screens/ToursScreen'
 import LeadsScreen from './hms/screens/LeadsScreen'
+import TripExplorerModule from './hms/screens/TripExplorerModule'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,12 +41,12 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             {/* Public-facing tour explorer */}
-            <Route path="/" element={<HomeScreen />} />
-            <Route path="/bali" element={<DestinationScreen />} />
-            <Route path="/bali/:cityId" element={<AreaScreen />} />
-            <Route path="/vietnam" element={<VietnamScreen />} />
-            <Route path="/vietnam/:cityId" element={<AreaScreen />} />
-            <Route path="/summary" element={<SummaryScreen />} />
+            <Route path="/" element={<TripExplorerProvider basePath=""><HomeScreen /></TripExplorerProvider>} />
+            <Route path="/bali" element={<TripExplorerProvider basePath=""><DestinationScreen /></TripExplorerProvider>} />
+            <Route path="/bali/:cityId" element={<TripExplorerProvider basePath=""><AreaScreen /></TripExplorerProvider>} />
+            <Route path="/vietnam" element={<TripExplorerProvider basePath=""><VietnamScreen /></TripExplorerProvider>} />
+            <Route path="/vietnam/:cityId" element={<TripExplorerProvider basePath=""><AreaScreen /></TripExplorerProvider>} />
+            <Route path="/summary" element={<TripExplorerProvider basePath=""><SummaryScreen /></TripExplorerProvider>} />
             <Route path="/admin" element={<AdminScreen />} />
 
             {/* Sales team rate portal — PIN protected, no HMS login needed */}
@@ -61,6 +63,7 @@ export default function App() {
                 <Route path="rates/quote" element={<RateViewerScreen />} />
                 <Route path="reservations" element={<ReservationsScreen />} />
                 <Route path="tours" element={<ToursScreen />} />
+                <Route path="trip-explorer/*" element={<TripExplorerModule />} />
                 <Route path="settings" element={<SettingsScreen />} />
               </Route>
             </Route>

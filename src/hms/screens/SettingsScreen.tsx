@@ -15,6 +15,7 @@ const MODULE_LABELS: Record<string, string> = {
   rates:        '🏨 Rates',
   reservations: '📅 Reservations',
   tours:        '🗺 Tours',
+  'trip-explorer': '🌍 Trip Explorer',
   settings:     '⚙️ Settings',
 }
 

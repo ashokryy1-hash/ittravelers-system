@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Search, GitMerge, Building2, CalendarCheck,
-  Settings, LayoutDashboard, LogOut, Menu, Map, Users
+  Settings, LayoutDashboard, LogOut, Menu, Map, Users, Globe
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -14,6 +14,7 @@ const ALL_NAV = [
   { to: '/hms/rates',        label: 'Rates',        icon: Building2,                    key: 'rates' },
   { to: '/hms/reservations', label: 'Reservations', icon: CalendarCheck,                key: 'reservations' },
   { to: '/hms/tours',        label: 'Tours',        icon: Map,                          key: 'tours' },
+  { to: '/hms/trip-explorer', label: 'Trip Explorer', icon: Globe,                       key: 'trip-explorer' },
   { to: '/hms/settings',     label: 'Settings',     icon: Settings,                     key: 'settings' },
 ]
 

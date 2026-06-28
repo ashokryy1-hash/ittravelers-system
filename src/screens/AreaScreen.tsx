@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Building2, Map } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSession } from '../context/SessionContext'
+import { useBasePath } from '../context/TripExplorerContext'
 import HotelCard from '../components/HotelCard'
 import TourCard from '../components/TourCard'
 import type { City, Hotel, Tour } from '../types'
@@ -24,7 +25,10 @@ export default function AreaScreen() {
   const { cityId } = useParams<{ cityId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const destSlug = location.pathname.split('/')[1] // 'bali' or 'vietnam'
+  const basePath = useBasePath()
+  // Extract dest slug: path after basePath, e.g. /bali/cityId or /hms/trip-explorer/bali/cityId
+  const afterBase = location.pathname.slice(basePath.length)
+  const destSlug = afterBase.split('/').filter(Boolean)[0] ?? 'bali'
   const { totalCount } = useSession()
   const [activeTab, setActiveTab] = useState<Tab>('hotels')
   const [tourCategory, setTourCategory] = useState<string>('All')
@@ -108,7 +112,7 @@ export default function AreaScreen() {
       <div className="min-h-screen bg-ivory-100 flex items-center justify-center">
         <div className="text-center">
           <p className="font-body text-gray-500 mb-4">Area not found.</p>
-          <button onClick={() => navigate('/' + destSlug)} className="text-terracotta-500 underline">Back to Bali</button>
+          <button onClick={() => navigate(`${basePath}/${destSlug}`)} className="text-terracotta-500 underline">Back to {destSlug.charAt(0).toUpperCase() + destSlug.slice(1)}</button>
         </div>
       </div>
     )
@@ -120,7 +124,7 @@ export default function AreaScreen() {
       <div className="bg-white border-b border-ivory-300 sticky top-0 z-40 shadow-sm">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
-            onClick={() => navigate('/' + destSlug)}
+            onClick={() => navigate(`${basePath}/${destSlug}`)}
             className="flex items-center gap-2 text-terracotta-600 hover:text-terracotta-700 font-body text-sm font-medium transition-colors"
           >
             <ArrowLeft size={16} />
@@ -128,7 +132,7 @@ export default function AreaScreen() {
           </button>
           {totalCount > 0 && (
             <button
-              onClick={() => navigate('/summary')}
+              onClick={() => navigate(`${basePath}/summary`)}
               className="bg-terracotta-500 hover:bg-terracotta-600 text-white px-4 py-1.5 rounded-full text-sm font-body font-medium shadow transition-colors"
             >
               {totalCount} selected
