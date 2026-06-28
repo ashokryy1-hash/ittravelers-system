@@ -230,7 +230,7 @@ export default function DiscoveryScreen() {
             key={key}
             onClick={() => setTab(key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === key ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+              tab === key ? 'border-terracotta-600 text-terracotta-600' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             {label}
@@ -268,7 +268,7 @@ export default function DiscoveryScreen() {
                 <button
                   onClick={search}
                   disabled={searching}
-                  className="w-full flex items-center justify-center gap-2 bg-teal-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 bg-terracotta-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-terracotta-700 disabled:opacity-50"
                 >
                   <Search size={15} />
                   {searching ? 'Searching…' : 'Search Hotels'}
@@ -288,7 +288,7 @@ export default function DiscoveryScreen() {
                   <button
                     onClick={() => addToOutreach.mutate(selectedPlaces.map(p => ({ ...p, google_maps_url: p.geometry ? `https://maps.google.com/?q=${p.geometry.location.lat},${p.geometry.location.lng}` : null })))}
                     disabled={addToOutreach.isPending}
-                    className="flex items-center gap-2 bg-teal-600 text-white rounded-lg px-4 py-2 text-sm hover:bg-teal-700 disabled:opacity-50"
+                    className="flex items-center gap-2 bg-terracotta-600 text-white rounded-lg px-4 py-2 text-sm hover:bg-terracotta-700 disabled:opacity-50"
                   >
                     <Plus size={15} /> Add {selectedPlaces.length} to Outreach Pipeline
                   </button>
@@ -331,8 +331,8 @@ export default function DiscoveryScreen() {
             <>
               {/* Bulk action bar */}
               {(savedSelected.size > 0 || selectedSaved.length > 0) && (
-                <div className="flex items-center gap-3 mb-4 p-3 bg-teal-50 border border-teal-200 rounded-xl">
-                  <span className="text-sm text-teal-700 font-medium">{savedSelected.size} selected</span>
+                <div className="flex items-center gap-3 mb-4 p-3 bg-terracotta-50 border border-terracotta-200 rounded-xl">
+                  <span className="text-sm text-terracotta-700 font-medium">{savedSelected.size} selected</span>
                   {selectedSaved.length > 0 && (
                     <button
                       onClick={() => addToOutreach.mutate(selectedSaved.map(h => ({
@@ -340,7 +340,7 @@ export default function DiscoveryScreen() {
                         google_maps_url: h.google_maps_url, contactEmail: h.contact_email,
                       })))}
                       disabled={addToOutreach.isPending}
-                      className="flex items-center gap-1 text-sm bg-teal-600 text-white rounded-lg px-3 py-1.5 hover:bg-teal-700 disabled:opacity-50"
+                      className="flex items-center gap-1 text-sm bg-terracotta-600 text-white rounded-lg px-3 py-1.5 hover:bg-terracotta-700 disabled:opacity-50"
                     >
                       <Plus size={14} /> Add to Outreach Pipeline
                     </button>
@@ -363,7 +363,7 @@ export default function DiscoveryScreen() {
                         key={h.id}
                         className={`bg-white border rounded-xl p-4 flex items-start gap-3 ${
                           h.added_to_outreach ? 'opacity-50 border-slate-200' :
-                          savedSelected.has(h.id) ? 'border-teal-400 bg-teal-50' : 'border-slate-200'
+                          savedSelected.has(h.id) ? 'border-terracotta-400 bg-terracotta-50' : 'border-slate-200'
                         }`}
                       >
                         {!h.added_to_outreach && (
@@ -371,7 +371,7 @@ export default function DiscoveryScreen() {
                             type="checkbox"
                             checked={savedSelected.has(h.id)}
                             onChange={() => toggleSavedSelect(h.id)}
-                            className="mt-1 h-4 w-4 accent-teal-600 shrink-0"
+                            className="mt-1 h-4 w-4 accent-terracotta-600 shrink-0"
                           />
                         )}
                         <div className="flex-1 min-w-0">
@@ -383,7 +383,7 @@ export default function DiscoveryScreen() {
                               </span>
                             )}
                             {h.added_to_outreach && (
-                              <span className="flex items-center gap-1 text-xs font-medium text-teal-600 bg-teal-100 rounded-full px-2 py-0.5">
+                              <span className="flex items-center gap-1 text-xs font-medium text-terracotta-600 bg-terracotta-100 rounded-full px-2 py-0.5">
                                 <CheckCircle size={11} /> In Outreach
                               </span>
                             )}
@@ -401,7 +401,7 @@ export default function DiscoveryScreen() {
                               </a>
                             )}
                             {h.contact_email && (
-                              <span className="flex items-center gap-1 text-xs text-teal-700">
+                              <span className="flex items-center gap-1 text-xs text-terracotta-700">
                                 <CheckCircle size={11} /> {h.contact_email}
                               </span>
                             )}
@@ -430,11 +430,11 @@ function PlaceCard({ place, selected, onToggle, onEmailChange, onFindEmail }: {
   return (
     <div className={`bg-white border rounded-xl p-4 transition-colors ${
       place.alreadyTracked ? 'border-slate-200 opacity-60' :
-      selected ? 'border-teal-400 bg-teal-50' : 'border-slate-200'
+      selected ? 'border-terracotta-400 bg-terracotta-50' : 'border-slate-200'
     }`}>
       <div className="flex items-start gap-3">
         {!place.alreadyTracked && (
-          <input type="checkbox" checked={selected} onChange={onToggle} className="mt-1 h-4 w-4 accent-teal-600" />
+          <input type="checkbox" checked={selected} onChange={onToggle} className="mt-1 h-4 w-4 accent-terracotta-600" />
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -445,7 +445,7 @@ function PlaceCard({ place, selected, onToggle, onEmailChange, onFindEmail }: {
               </span>
             )}
             {place.alreadyTracked && (
-              <span className="flex items-center gap-1 text-xs font-medium text-teal-600 bg-teal-100 rounded-full px-2 py-0.5">
+              <span className="flex items-center gap-1 text-xs font-medium text-terracotta-600 bg-terracotta-100 rounded-full px-2 py-0.5">
                 <CheckCircle size={11} /> Already tracked
               </span>
             )}
@@ -474,7 +474,7 @@ function PlaceCard({ place, selected, onToggle, onEmailChange, onFindEmail }: {
           <div className="mt-2">
             {place.emailStatus === 'idle' && (
               <div className="flex items-center gap-2">
-                <button onClick={onFindEmail} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1">
+                <button onClick={onFindEmail} className="text-xs text-terracotta-600 hover:text-terracotta-700 flex items-center gap-1">
                   <Mail size={11} /> Find contact email
                 </button>
                 <span className="text-slate-300">|</span>
@@ -492,7 +492,7 @@ function PlaceCard({ place, selected, onToggle, onEmailChange, onFindEmail }: {
                   type="email"
                   placeholder="email@hotel.com"
                   autoFocus
-                  className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-terracotta-400"
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
                       const val = (e.target as HTMLInputElement).value.trim()
@@ -506,7 +506,7 @@ function PlaceCard({ place, selected, onToggle, onEmailChange, onFindEmail }: {
             {place.emailStatus === 'searching' && <span className="text-xs text-slate-400">Searching…</span>}
             {place.emailStatus === 'found' && place.contactEmail && (
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-xs text-teal-700"><CheckCircle size={11} /> {place.contactEmail}</span>
+                <span className="flex items-center gap-1 text-xs text-terracotta-700"><CheckCircle size={11} /> {place.contactEmail}</span>
                 <button
                   onClick={() => onEmailChange(r => r.map(p => p.place_id === place.place_id ? { ...p, emailStatus: 'manual', contactEmail: null } : p))}
                   className="text-xs text-slate-400 hover:text-slate-600"
@@ -518,7 +518,7 @@ function PlaceCard({ place, selected, onToggle, onEmailChange, onFindEmail }: {
                 <span className="flex items-center gap-1 text-xs text-slate-400"><AlertCircle size={11} /> Not found</span>
                 <button
                   onClick={() => onEmailChange(r => r.map(p => p.place_id === place.place_id ? { ...p, emailStatus: 'manual' } : p))}
-                  className="text-xs text-teal-600 hover:text-teal-700"
+                  className="text-xs text-terracotta-600 hover:text-terracotta-700"
                 >Add manually</button>
               </div>
             )}
@@ -529,4 +529,4 @@ function PlaceCard({ place, selected, onToggle, onEmailChange, onFindEmail }: {
   )
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'

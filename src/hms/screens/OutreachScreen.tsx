@@ -16,7 +16,7 @@ const STAGE_COLORS: Record<Stage, string> = {
   Contacted: 'bg-blue-50 border-blue-200',
   Replied: 'bg-purple-50 border-purple-200',
   Negotiating: 'bg-amber-50 border-amber-200',
-  Signed: 'bg-teal-50 border-teal-200',
+  Signed: 'bg-terracotta-50 border-terracotta-200',
   Declined: 'bg-red-50 border-red-200',
 }
 
@@ -25,7 +25,7 @@ const STAGE_HEADER: Record<Stage, string> = {
   Contacted: 'text-blue-600',
   Replied: 'text-purple-600',
   Negotiating: 'text-amber-600',
-  Signed: 'text-teal-600',
+  Signed: 'text-terracotta-600',
   Declined: 'text-red-600',
 }
 
@@ -296,7 +296,7 @@ Agency signature: ${settings.agency_signature}`
         <h1 className="text-2xl font-bold text-slate-800">Outreach Pipeline</h1>
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-1 text-sm bg-teal-600 text-white rounded-lg px-4 py-2 hover:bg-teal-700"
+          className="flex items-center gap-1 text-sm bg-terracotta-600 text-white rounded-lg px-4 py-2 hover:bg-terracotta-700"
         >
           <Plus size={15} /> Add Hotel
         </button>
@@ -461,9 +461,9 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
                   onChange={e => setContactEmail(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && saveContactEmail()}
                   placeholder="hotel@email.com"
-                  className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-terracotta-400"
                 />
-                <button onClick={saveContactEmail} className="text-xs bg-teal-600 text-white rounded px-2 py-1 hover:bg-teal-700">Save</button>
+                <button onClick={saveContactEmail} className="text-xs bg-terracotta-600 text-white rounded px-2 py-1 hover:bg-terracotta-700">Save</button>
                 <button onClick={() => setEditingEmail(false)} className="text-xs text-slate-400 hover:text-slate-600 px-1">✕</button>
               </div>
             ) : (
@@ -496,7 +496,7 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
             {hotel.stage === 'Prospect' && (
               <>
                 <button onClick={() => onTemplate('initial')}
-                  className="w-full flex items-center justify-center gap-1 text-xs bg-teal-600 text-white rounded-lg py-1.5 hover:bg-teal-700">
+                  className="w-full flex items-center justify-center gap-1 text-xs bg-terracotta-600 text-white rounded-lg py-1.5 hover:bg-terracotta-700">
                   <Mail size={12} /> Partnership outreach
                 </button>
                 <button onClick={() => onDraftEmail('initial')}
@@ -551,7 +551,7 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
 
             {hotel.stage === 'Signed' && (
               <button onClick={() => onTemplate('welcome')}
-                className="w-full flex items-center justify-center gap-1 text-xs bg-teal-600 text-white rounded-lg py-1.5 hover:bg-teal-700">
+                className="w-full flex items-center justify-center gap-1 text-xs bg-terracotta-600 text-white rounded-lg py-1.5 hover:bg-terracotta-700">
                 <Mail size={12} /> Welcome + first booking info
               </button>
             )}
@@ -569,9 +569,9 @@ function HotelCard({ hotel, expanded, onToggle, onStageChange, onDraftEmail, onT
             {showEmailLog && (
               <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
                 {emails?.map(e => (
-                  <div key={e.id} className={`text-xs rounded-lg p-2 ${e.direction === 'sent' ? 'bg-teal-50 border border-teal-100' : 'bg-gray-50 border border-gray-100'}`}>
+                  <div key={e.id} className={`text-xs rounded-lg p-2 ${e.direction === 'sent' ? 'bg-terracotta-50 border border-terracotta-100' : 'bg-gray-50 border border-gray-100'}`}>
                     <div className="flex justify-between mb-0.5">
-                      <span className={`font-medium ${e.direction === 'sent' ? 'text-teal-700' : 'text-slate-600'}`}>
+                      <span className={`font-medium ${e.direction === 'sent' ? 'text-terracotta-700' : 'text-slate-600'}`}>
                         {e.direction === 'sent' ? '→ Sent' : '← Received'}
                       </span>
                       <span className="text-slate-400">{e.sent_at.split('T')[0]}</span>
@@ -679,7 +679,7 @@ function AddHotelForm({ destinations, onClose, onSaved }: {
         <button
           onClick={save}
           disabled={saving || !form.name}
-          className="text-sm bg-teal-600 text-white rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+          className="text-sm bg-terracotta-600 text-white rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Add to Pipeline'}
         </button>
@@ -688,4 +688,4 @@ function AddHotelForm({ destinations, onClose, onSaved }: {
   )
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'

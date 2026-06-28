@@ -135,7 +135,7 @@ export default function DashboardScreen() {
         {/* Pending bookings */}
         <section className="md:col-span-2">
           <h2 className="flex items-center gap-2 text-base font-semibold text-slate-700 mb-3">
-            <CalendarCheck size={16} className="text-teal-500" />
+            <CalendarCheck size={16} className="text-terracotta-500" />
             Upcoming Bookings Awaiting Availability
           </h2>
           {pendingBookings.length === 0 ? (
@@ -167,7 +167,7 @@ export default function DashboardScreen() {
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   const colors: Record<string, string> = {
-    teal: 'bg-teal-50 border-teal-200 text-teal-700',
+    teal: 'bg-terracotta-50 border-terracotta-200 text-terracotta-700',
     amber: 'bg-amber-50 border-amber-200 text-amber-700',
     green: 'bg-green-50 border-green-200 text-green-700',
     slate: 'bg-slate-50 border-slate-200 text-slate-700',

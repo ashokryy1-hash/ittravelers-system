@@ -113,7 +113,7 @@ export default function SettingsScreen() {
         <button
           onClick={save}
           disabled={saving}
-          className="flex items-center gap-2 bg-teal-600 text-white rounded-lg px-6 py-2.5 text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+          className="flex items-center gap-2 bg-terracotta-600 text-white rounded-lg px-6 py-2.5 text-sm font-medium hover:bg-terracotta-700 disabled:opacity-50"
         >
           <Save size={15} />
           {saving ? 'Saving…' : 'Save Settings'}
@@ -202,7 +202,7 @@ function SetupGuide({ title, steps }: { title: string; steps: string[] }) {
         <ol className="px-4 pb-4 space-y-2">
           {steps.map((step, i) => (
             <li key={i} className="flex gap-2 text-sm text-slate-600">
-              <span className="text-teal-600 font-bold shrink-0">{i + 1}.</span>
+              <span className="text-terracotta-600 font-bold shrink-0">{i + 1}.</span>
               <span>{step}</span>
             </li>
           ))}
@@ -289,7 +289,7 @@ function TeamSection() {
                 onClick={() => toggleModule(key)}
                 className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
                   selected.includes(key)
-                    ? 'bg-teal-600 text-white border-teal-600'
+                    ? 'bg-terracotta-600 text-white border-terracotta-600'
                     : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -301,7 +301,7 @@ function TeamSection() {
         <button
           onClick={addUser}
           disabled={saving}
-          className="flex items-center gap-2 bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+          className="flex items-center gap-2 bg-terracotta-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-terracotta-700 disabled:opacity-50"
         >
           <UserPlus size={14} />
           {saving ? 'Saving…' : 'Add / Update User'}
@@ -328,7 +328,7 @@ function TeamSection() {
                     onClick={() => updateModules(user, key)}
                     className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
                       user.allowed_modules.includes(key)
-                        ? 'bg-teal-600 text-white border-teal-600'
+                        ? 'bg-terracotta-600 text-white border-terracotta-600'
                         : 'bg-white text-slate-400 border-slate-200'
                     }`}
                   >
@@ -344,4 +344,4 @@ function TeamSection() {
   )
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'

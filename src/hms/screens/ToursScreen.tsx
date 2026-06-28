@@ -138,8 +138,8 @@ function normalizeClientKey(name: string): string {
   return name.trim().toLowerCase()
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
-const inpSm = 'w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'
+const inpSm = 'w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -154,7 +154,7 @@ export default function ToursScreen() {
         {tab === 'tours' && (
           <button
             onClick={() => setShowNew(true)}
-            className="flex items-center gap-2 bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-700"
+            className="flex items-center gap-2 bg-terracotta-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-terracotta-700"
           >
             <Plus size={15} /> New Tour
           </button>
@@ -168,7 +168,7 @@ export default function ToursScreen() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
-              tab === t ? 'border-teal-500 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+              tab === t ? 'border-terracotta-500 text-terracotta-600' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             {t === 'tours' ? 'Itineraries' : 'Activity Library'}
@@ -285,7 +285,7 @@ function ClientsView({ tours }: { tours: Tour[] }) {
               onClick={() => toggleClient(key)}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
             >
-              <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-terracotta-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                 {initial}
               </div>
               <div className="flex-1">
@@ -351,7 +351,7 @@ function TourCard({ tour }: { tour: Tour }) {
           {copied ? <Check size={13} /> : <Copy size={13} />}
           {copied ? 'Copied!' : 'WhatsApp'}
         </button>
-        <button onClick={() => setEditing(true)} className="text-slate-400 hover:text-teal-600 transition-colors p-1" title="Edit tour">
+        <button onClick={() => setEditing(true)} className="text-slate-400 hover:text-terracotta-600 transition-colors p-1" title="Edit tour">
           <Pencil size={15} />
         </button>
         <button onClick={deleteTour} className="text-slate-400 hover:text-red-500 transition-colors p-1">
@@ -374,7 +374,7 @@ function TourCard({ tour }: { tour: Tour }) {
             const acts = [...(day.hms_tour_activities ?? [])].sort((a, b) => a.sort_order - b.sort_order)
             return (
               <div key={day.id}>
-                <div className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-1">
+                <div className="text-xs font-bold text-terracotta-700 uppercase tracking-wide mb-1">
                   🌴 {formatDay(day.date, i + 1)}
                 </div>
                 <div className="space-y-0.5 pl-2">
@@ -506,7 +506,7 @@ function LibraryTab() {
         <p className="text-sm text-slate-500">Reusable day programs you can insert when building a tour</p>
         <button
           onClick={() => setShowNew(s => !s)}
-          className="flex items-center gap-2 border border-teal-600 text-teal-600 rounded-lg px-3 py-1.5 text-sm hover:bg-teal-50"
+          className="flex items-center gap-2 border border-terracotta-600 text-terracotta-600 rounded-lg px-3 py-1.5 text-sm hover:bg-terracotta-50"
         >
           <Plus size={14} /> Add Template
         </button>
@@ -540,14 +540,14 @@ function LibraryTab() {
             ))}
             <button
               onClick={() => setNewActivities(a => [...a, { time: '', description: '' }])}
-              className="text-xs text-teal-600 hover:underline"
+              className="text-xs text-terracotta-600 hover:underline"
             >
               + Add activity
             </button>
           </div>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowNew(false)} className="text-sm text-slate-500 px-3 py-1.5">Cancel</button>
-            <button onClick={saveTemplate} className="bg-teal-600 text-white text-sm rounded-lg px-4 py-1.5 hover:bg-teal-700">Save</button>
+            <button onClick={saveTemplate} className="bg-terracotta-600 text-white text-sm rounded-lg px-4 py-1.5 hover:bg-terracotta-700">Save</button>
           </div>
         </div>
       )}
@@ -584,14 +584,14 @@ function LibraryTab() {
                   ))}
                   <button
                     onClick={() => setEditActivities(a => [...a, { time: '', description: '' }])}
-                    className="text-xs text-teal-600 hover:underline"
+                    className="text-xs text-terracotta-600 hover:underline"
                   >
                     + Add activity
                   </button>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button onClick={cancelEdit} className="text-sm text-slate-500 px-3 py-1.5">Cancel</button>
-                  <button onClick={() => saveEdit(t.id)} className="bg-teal-600 text-white text-sm rounded-lg px-4 py-1.5 hover:bg-teal-700">Save</button>
+                  <button onClick={() => saveEdit(t.id)} className="bg-terracotta-600 text-white text-sm rounded-lg px-4 py-1.5 hover:bg-terracotta-700">Save</button>
                 </div>
               </div>
             ) : (
@@ -600,7 +600,7 @@ function LibraryTab() {
                 <div className="flex items-start justify-between">
                   <div className="font-semibold text-slate-700">{t.icon} {t.name}</div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => startEdit(t)} className="text-slate-400 hover:text-teal-600 p-1" title="Edit template">
+                    <button onClick={() => startEdit(t)} className="text-slate-400 hover:text-terracotta-600 p-1" title="Edit template">
                       <Pencil size={13} />
                     </button>
                     <button onClick={() => deleteTemplate(t.id)} className="text-slate-400 hover:text-red-500 p-1">
@@ -831,7 +831,7 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
             <div className="flex flex-wrap gap-1 items-center">
               <span className="text-[10px] text-slate-400">Confirmed hotels:</span>
               {confirmedHotels.map(h => (
-                <span key={h} className="text-[10px] bg-teal-100 text-teal-700 border border-teal-200 rounded px-1.5 py-0.5 font-medium">{h}</span>
+                <span key={h} className="text-[10px] bg-terracotta-100 text-terracotta-700 border border-terracotta-200 rounded px-1.5 py-0.5 font-medium">{h}</span>
               ))}
             </div>
           )}
@@ -841,12 +841,12 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
             <div key={dayIdx} className="border border-gray-200 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-teal-700">🌴 Day {dayIdx + 1}</span>
+                  <span className="text-sm font-bold text-terracotta-700">🌴 Day {dayIdx + 1}</span>
                   <input
                     type="date"
                     value={day.date}
                     onChange={e => setDayDate(dayIdx, e.target.value)}
-                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-terracotta-400"
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -918,7 +918,7 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
                             <div className="flex flex-wrap gap-1">
                               {confirmedHotels.map(h => (
                                 <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
-                                  className="text-[10px] bg-slate-100 hover:bg-teal-100 text-slate-600 hover:text-teal-800 border border-slate-200 rounded px-1.5 py-0.5">→ {h}</button>
+                                  className="text-[10px] bg-slate-100 hover:bg-terracotta-100 text-slate-600 hover:text-terracotta-800 border border-slate-200 rounded px-1.5 py-0.5">→ {h}</button>
                               ))}
                             </div>
                           )}
@@ -981,13 +981,13 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
                     </div>
                   )
                 })}
-                <button onClick={() => addActivity(dayIdx)} className="text-xs text-teal-600 hover:underline">+ Add activity</button>
+                <button onClick={() => addActivity(dayIdx)} className="text-xs text-terracotta-600 hover:underline">+ Add activity</button>
               </div>
             </div>
           ))}
 
           <button onClick={addDay}
-            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-slate-500 hover:border-teal-400 hover:text-teal-600 transition-colors">
+            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-slate-500 hover:border-terracotta-400 hover:text-terracotta-600 transition-colors">
             + Add Day
           </button>
 
@@ -1001,7 +1001,7 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="text-sm text-slate-500 px-4 py-2 hover:text-slate-700">Cancel</button>
           <button onClick={save} disabled={saving}
-            className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50">
+            className="bg-terracotta-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50">
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
@@ -1018,7 +1018,7 @@ interface DayDraft {
 }
 
 const TYPE_CONFIG = {
-  stop:           { label: '🏖 Tour Stop',       bg: 'bg-teal-50 border-teal-200 text-teal-700' },
+  stop:           { label: '🏖 Tour Stop',       bg: 'bg-terracotta-50 border-terracotta-200 text-terracotta-700' },
   transfer:       { label: '🚗 Transfer',         bg: 'bg-slate-100 border-slate-300 text-slate-700' },
   'airport-pickup':  { label: '✈️ Airport Pickup',  bg: 'bg-blue-50 border-blue-300 text-blue-700' },
   'airport-dropoff': { label: '🛫 Airport Drop-off', bg: 'bg-purple-50 border-purple-300 text-purple-700' },
@@ -1249,30 +1249,30 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
                 <button
                   key={normalizeClientKey(client.name)}
                   onClick={() => pickClient(client)}
-                  className="w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-colors group"
+                  className="w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-terracotta-400 hover:bg-terracotta-50 transition-colors group"
                 >
-                  <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-terracotta-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                     {client.name.trim()[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-800 group-hover:text-teal-800">{client.name}</div>
+                    <div className="font-semibold text-slate-800 group-hover:text-terracotta-800">{client.name}</div>
                     <div className="text-xs text-slate-500">{client.totalBookings} booking{client.totalBookings !== 1 ? 's' : ''}</div>
                     {client.confirmedHotels.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {client.confirmedHotels.map(h => (
-                          <span key={h} className="text-[10px] bg-teal-100 text-teal-700 rounded px-1.5 py-0.5">{h}</span>
+                          <span key={h} className="text-[10px] bg-terracotta-100 text-terracotta-700 rounded px-1.5 py-0.5">{h}</span>
                         ))}
                       </div>
                     )}
                   </div>
-                  <ChevronRight size={14} className="text-slate-300 group-hover:text-teal-500 flex-shrink-0" />
+                  <ChevronRight size={14} className="text-slate-300 group-hover:text-terracotta-500 flex-shrink-0" />
                 </button>
               ))}
 
               {/* New client option */}
               <button
                 onClick={pickNewClient}
-                className="w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-dashed border-gray-300 hover:border-teal-400 hover:bg-teal-50 transition-colors"
+                className="w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-dashed border-gray-300 hover:border-terracotta-400 hover:bg-terracotta-50 transition-colors"
               >
                 <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-slate-400 flex-shrink-0">
                   <Plus size={16} />
@@ -1293,8 +1293,8 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
           <>
             <div className="p-6 space-y-5">
               {/* Selected client card */}
-              <div className="flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
-                <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              <div className="flex items-center gap-3 bg-terracotta-50 border border-terracotta-200 rounded-xl px-4 py-3">
+                <div className="w-9 h-9 rounded-full bg-terracotta-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                   {(clientName || '?').trim()[0]?.toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -1307,12 +1307,12 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
                   {confirmedHotels.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {confirmedHotels.map(h => (
-                        <span key={h} className="text-[10px] bg-teal-200 text-teal-800 rounded px-1.5 py-0.5 font-medium">{h}</span>
+                        <span key={h} className="text-[10px] bg-terracotta-200 text-terracotta-800 rounded px-1.5 py-0.5 font-medium">{h}</span>
                       ))}
                     </div>
                   )}
                 </div>
-                <button onClick={() => setStep('pick-client')} className="text-xs text-teal-600 hover:underline flex-shrink-0">Change</button>
+                <button onClick={() => setStep('pick-client')} className="text-xs text-terracotta-600 hover:underline flex-shrink-0">Change</button>
               </div>
 
               {/* Pax + contact */}
@@ -1336,12 +1336,12 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
                 <div key={dayIdx} className="border border-gray-200 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-teal-700">🌴 Day {dayIdx + 1}</span>
+                      <span className="text-sm font-bold text-terracotta-700">🌴 Day {dayIdx + 1}</span>
                       <input
                         type="date"
                         value={day.date}
                         onChange={e => setDayDate(dayIdx, e.target.value)}
-                        className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                        className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-terracotta-400"
                       />
                     </div>
                     <div className="flex items-center gap-2">
@@ -1443,7 +1443,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
                                 <div className="flex flex-wrap gap-1">
                                   {confirmedHotels.map(h => (
                                     <button key={h} type="button" onClick={() => setActivity(dayIdx, actIdx, 'to', h)}
-                                      className="text-[10px] bg-slate-100 hover:bg-teal-100 text-slate-600 hover:text-teal-800 border border-slate-200 rounded px-1.5 py-0.5 transition-colors">
+                                      className="text-[10px] bg-slate-100 hover:bg-terracotta-100 text-slate-600 hover:text-terracotta-800 border border-slate-200 rounded px-1.5 py-0.5 transition-colors">
                                       → {h}
                                     </button>
                                   ))}
@@ -1534,7 +1534,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
                         </div>
                       )
                     })}
-                    <button onClick={() => addActivity(dayIdx)} className="text-xs text-teal-600 hover:underline">
+                    <button onClick={() => addActivity(dayIdx)} className="text-xs text-terracotta-600 hover:underline">
                       + Add activity
                     </button>
                   </div>
@@ -1543,7 +1543,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
 
               <button
                 onClick={addDay}
-                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-slate-500 hover:border-teal-400 hover:text-teal-600 transition-colors"
+                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-2.5 text-sm text-slate-500 hover:border-terracotta-400 hover:text-terracotta-600 transition-colors"
               >
                 + Add Day
               </button>
@@ -1565,7 +1565,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
               <button
                 onClick={save}
                 disabled={saving}
-                className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+                className="bg-terracotta-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50"
               >
                 {saving ? 'Saving…' : 'Create Tour'}
               </button>

@@ -136,7 +136,7 @@ export default function RateViewerScreen() {
             <button
               onClick={search}
               disabled={searching}
-              className="w-full bg-teal-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+              className="w-full bg-terracotta-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-terracotta-700 disabled:opacity-50"
             >
               {searching ? 'Searching…' : 'Search Rates'}
             </button>
@@ -197,7 +197,7 @@ Total: ${currency} ${totalStay.toLocaleString()} ≈ EGP ${Math.round(totalEgp).
           </div>
           {roomType.notes && <div className="text-xs text-slate-400 mt-0.5">{roomType.notes}</div>}
         </div>
-        <button onClick={copy} className="flex items-center gap-1 text-xs text-teal-600 border border-teal-200 rounded-lg px-3 py-1.5 hover:bg-teal-50 shrink-0">
+        <button onClick={copy} className="flex items-center gap-1 text-xs text-terracotta-600 border border-terracotta-200 rounded-lg px-3 py-1.5 hover:bg-terracotta-50 shrink-0">
           <Copy size={12} /> Copy quote
         </button>
       </div>
@@ -219,9 +219,9 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
   return (
     <div>
       <div className="text-xs text-slate-400">{label}</div>
-      <div className={`font-medium ${highlight ? 'text-teal-700' : 'text-slate-800'}`}>{value}</div>
+      <div className={`font-medium ${highlight ? 'text-terracotta-700' : 'text-slate-800'}`}>{value}</div>
     </div>
   )
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'

@@ -18,7 +18,7 @@ function daysUntil(dateStr: string | null | undefined): number | null {
 
 const STATUS_COLORS: Record<string, string> = {
   'Availability pending': 'bg-amber-100 text-amber-700',
-  'Confirmed': 'bg-teal-100 text-teal-700',
+  'Confirmed': 'bg-terracotta-100 text-terracotta-700',
   'Paid': 'bg-green-100 text-green-700',
   'Cancelled': 'bg-red-100 text-red-700',
 }
@@ -353,7 +353,7 @@ Agency signature: ${settings.agency_signature}`
           </div>
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-1 text-sm bg-teal-600 text-white rounded-lg px-4 py-2 hover:bg-teal-700"
+            className="flex items-center gap-1 text-sm bg-terracotta-600 text-white rounded-lg px-4 py-2 hover:bg-terracotta-700"
           >
             <Plus size={15} /> New Booking
           </button>
@@ -364,7 +364,7 @@ Agency signature: ${settings.agency_signature}`
       <div className="flex gap-3 mb-5">
         <span className="text-sm text-slate-600">{bookings?.length ?? 0} total</span>
         <span className="text-sm text-amber-600">{pendingCount} pending</span>
-        <span className="text-sm text-teal-600">{confirmedCount} confirmed</span>
+        <span className="text-sm text-terracotta-600">{confirmedCount} confirmed</span>
       </div>
 
       {/* Filter */}
@@ -413,7 +413,7 @@ Agency signature: ${settings.agency_signature}`
                   onClick={() => setOpenClient(isOpen ? null : key)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-sm font-bold shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-terracotta-100 text-terracotta-700 flex items-center justify-center text-sm font-bold shrink-0">
                       {displayName.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -571,21 +571,21 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
               <>
                 <input
                   autoFocus
-                  className="text-sm font-medium border border-teal-400 rounded-lg px-3 py-1.5 flex-1 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  className="text-sm font-medium border border-terracotta-400 rounded-lg px-3 py-1.5 flex-1 focus:outline-none focus:ring-2 focus:ring-terracotta-400"
                   value={clientName}
                   onChange={e => setClientName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') saveClientName(); if (e.key === 'Escape') setEditingName(false) }}
                 />
-                <button onClick={saveClientName} className="text-xs bg-teal-600 text-white rounded-lg px-3 py-1.5 hover:bg-teal-700">Save</button>
+                <button onClick={saveClientName} className="text-xs bg-terracotta-600 text-white rounded-lg px-3 py-1.5 hover:bg-terracotta-700">Save</button>
                 <button onClick={() => setEditingName(false)} className="text-xs border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-50">Cancel</button>
               </>
             ) : (
               <button
                 onClick={e => { e.stopPropagation(); setEditingName(true) }}
-                className="text-sm font-medium text-slate-800 hover:text-teal-600 flex items-center gap-1 group"
+                className="text-sm font-medium text-slate-800 hover:text-terracotta-600 flex items-center gap-1 group"
               >
                 {clientName}
-                <span className="text-xs text-slate-400 group-hover:text-teal-500 opacity-0 group-hover:opacity-100 transition-opacity">(edit name)</span>
+                <span className="text-xs text-slate-400 group-hover:text-terracotta-500 opacity-0 group-hover:opacity-100 transition-opacity">(edit name)</span>
               </button>
             )}
           </div>
@@ -649,7 +649,7 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
                 />
                 <button
                   onClick={() => updateStatus.mutate({ status: booking.status, confirmNum: confirmNumber, cutoff: cutoffDate || null })}
-                  className="text-sm bg-teal-600 text-white rounded-lg px-3 py-1.5 hover:bg-teal-700"
+                  className="text-sm bg-terracotta-600 text-white rounded-lg px-3 py-1.5 hover:bg-terracotta-700"
                 >
                   Save
                 </button>
@@ -672,7 +672,7 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
             <div className="text-xs font-medium text-slate-500 mb-1.5">Email templates (instant, no AI needed)</div>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => onTemplate('availability')}
-                className="flex items-center gap-1 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5 hover:bg-teal-100">
+                className="flex items-center gap-1 text-xs text-terracotta-700 bg-terracotta-50 border border-terracotta-200 rounded-lg px-3 py-1.5 hover:bg-terracotta-100">
                 <Mail size={13} /> Availability request
               </button>
               {booking.status === 'Availability pending' && (
@@ -705,9 +705,9 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
             <div className="text-xs font-medium text-slate-600 mb-2">Email thread ({emails?.length ?? 0})</div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {emails?.map(e => (
-                <div key={e.id} className={`text-xs rounded-lg p-2 ${e.direction === 'sent' ? 'bg-teal-50 border border-teal-100' : 'bg-gray-50 border border-gray-100'}`}>
+                <div key={e.id} className={`text-xs rounded-lg p-2 ${e.direction === 'sent' ? 'bg-terracotta-50 border border-terracotta-100' : 'bg-gray-50 border border-gray-100'}`}>
                   <div className="flex justify-between mb-0.5">
-                    <span className={`font-medium ${e.direction === 'sent' ? 'text-teal-700' : 'text-slate-600'}`}>
+                    <span className={`font-medium ${e.direction === 'sent' ? 'text-terracotta-700' : 'text-slate-600'}`}>
                       {e.direction === 'sent' ? '→ Sent' : '← Received'}
                     </span>
                     <span className="text-slate-400">{e.sent_at.split('T')[0]}</span>
@@ -1008,7 +1008,7 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
         <button
           onClick={save}
           disabled={saving || !form.client_name || !form.checkin_date || !form.checkout_date || (hotelMode === 'contract' && !form.hotel_id) || (hotelMode === 'manual' && !form.manual_hotel_name)}
-          className="text-sm bg-teal-600 text-white rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+          className="text-sm bg-terracotta-600 text-white rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Create Booking'}
         </button>
@@ -1017,4 +1017,4 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
   )
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'

@@ -60,7 +60,7 @@ export default function EmailPreviewPanel({ to: initTo, subject: initSubject, bo
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {editing ? (
             <textarea
-              className="w-full h-64 border border-gray-300 rounded p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-400"
+              className="w-full h-64 border border-gray-300 rounded p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-terracotta-400"
               value={body}
               onChange={e => setBody(e.target.value)}
             />
@@ -82,7 +82,7 @@ export default function EmailPreviewPanel({ to: initTo, subject: initSubject, bo
           <button
             onClick={() => onSend(subject, body, to)}
             disabled={sending}
-            className="flex items-center gap-2 text-sm bg-teal-600 text-white rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+            className="flex items-center gap-2 text-sm bg-terracotta-600 text-white rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50"
           >
             <Send size={15} />
             {sending ? 'Sending…' : 'Send'}

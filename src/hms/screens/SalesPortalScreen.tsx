@@ -40,8 +40,8 @@ export default function SalesPortalScreen() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center">
-          <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Lock size={24} className="text-teal-600" />
+          <div className="w-14 h-14 bg-terracotta-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock size={24} className="text-terracotta-600" />
           </div>
           <h1 className="text-xl font-bold text-slate-800 mb-1">ITTravelers</h1>
           <p className="text-sm text-slate-500 mb-6">Sales Rate Portal</p>
@@ -52,13 +52,13 @@ export default function SalesPortalScreen() {
             value={pin}
             onChange={e => setPin(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && checkPin()}
-            className={`w-full text-center text-2xl tracking-widest border rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400 ${pinError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+            className={`w-full text-center text-2xl tracking-widest border rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-terracotta-400 ${pinError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
             autoFocus
           />
           {pinError && <p className="text-xs text-red-500 mb-3">Incorrect PIN. Please try again.</p>}
           <button
             onClick={checkPin}
-            className="w-full bg-teal-600 text-white rounded-xl py-3 font-medium hover:bg-teal-700 transition-colors"
+            className="w-full bg-terracotta-600 text-white rounded-xl py-3 font-medium hover:bg-terracotta-700 transition-colors"
           >
             Enter
           </button>
@@ -202,7 +202,7 @@ function QuoteTool() {
             <div className="flex gap-2">
               {['Bali'].map(d => (
                 <button key={d} onClick={() => { setDestination(d); setArea('') }}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${destination === d ? 'bg-teal-600 text-white border-teal-600' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${destination === d ? 'bg-terracotta-600 text-white border-terracotta-600' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
                   {d}
                 </button>
               ))}
@@ -251,7 +251,7 @@ function QuoteTool() {
             </div>
             <div className="flex items-end col-span-2 sm:col-span-1">
               <button onClick={search} disabled={searching}
-                className="w-full flex items-center justify-center gap-2 bg-teal-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
+                className="w-full flex items-center justify-center gap-2 bg-terracotta-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-terracotta-700 disabled:opacity-50">
                 <Search size={15} />
                 {searching ? 'Searching…' : 'Get Rates'}
               </button>
@@ -339,7 +339,7 @@ For bookings & inquiries: Ittravelers.com`
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-teal-300 transition-colors">
+    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-terracotta-300 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -352,11 +352,11 @@ For bookings & inquiries: Ittravelers.com`
           <div className="text-sm text-slate-600 mt-0.5">
             {roomType.name} · <span className="capitalize">{roomType.room_category}</span> · {roomType.meal_plan}
           </div>
-          {roomType.notes && <div className="text-xs text-teal-600 mt-0.5">✓ {roomType.notes}</div>}
+          {roomType.notes && <div className="text-xs text-terracotta-600 mt-0.5">✓ {roomType.notes}</div>}
         </div>
         <button
           onClick={copy}
-          className="flex items-center gap-1 text-xs text-teal-600 border border-teal-200 rounded-lg px-3 py-1.5 hover:bg-teal-50 shrink-0 font-medium"
+          className="flex items-center gap-1 text-xs text-terracotta-600 border border-terracotta-200 rounded-lg px-3 py-1.5 hover:bg-terracotta-50 shrink-0 font-medium"
         >
           <Copy size={12} /> Copy quote
         </button>
@@ -369,7 +369,7 @@ For bookings & inquiries: Ittravelers.com`
         </div>
         <div>
           <div className="text-xs text-slate-400">Total {nights}n ({currency})</div>
-          <div className="font-bold text-teal-700 text-base">{currency} {Math.round(totalStay).toLocaleString()}</div>
+          <div className="font-bold text-terracotta-700 text-base">{currency} {Math.round(totalStay).toLocaleString()}</div>
         </div>
         <div>
           <div className="text-xs text-slate-400">Season</div>
@@ -380,4 +380,4 @@ For bookings & inquiries: Ittravelers.com`
   )
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'

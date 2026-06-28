@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import PdfContractUpload from '../components/PdfContractUpload'
 
 function contractBadge(status: string) {
-  if (status === 'Active') return 'bg-teal-100 text-teal-700'
+  if (status === 'Active') return 'bg-terracotta-100 text-terracotta-700'
   if (status === 'Expiring soon') return 'bg-amber-100 text-amber-700'
   return 'bg-red-100 text-red-700'
 }
@@ -60,7 +60,7 @@ export default function RatesScreen() {
         <div className="flex gap-2">
           <Link
             to="/hms/rates/quote"
-            className="text-sm bg-teal-600 text-white rounded-lg px-4 py-2 hover:bg-teal-700"
+            className="text-sm bg-terracotta-600 text-white rounded-lg px-4 py-2 hover:bg-terracotta-700"
           >
             Rate Viewer / Quote
           </Link>
@@ -180,7 +180,7 @@ function HotelDetail({ hotel }: { hotel: HmsHotel }) {
         <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Room Types</span>
         <button
           onClick={() => { setEditRoom(null); setShowRoomForm(true) }}
-          className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
+          className="text-xs text-terracotta-600 hover:text-terracotta-700 flex items-center gap-1"
         >
           <Plus size={12} /> Add room type
         </button>
@@ -343,7 +343,7 @@ function HotelForm({ destinations, hotel, onClose, onSaved }: {
         <button
           onClick={save}
           disabled={saving || !form.name}
-          className="text-sm bg-teal-600 text-white rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+          className="text-sm bg-terracotta-600 text-white rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -439,7 +439,7 @@ function RoomTypeForm({ hotelId, room, onClose, onSaved }: {
         <button
           onClick={save}
           disabled={saving || !form.name}
-          className="text-sm bg-teal-600 text-white rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+          className="text-sm bg-terracotta-600 text-white rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -462,7 +462,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   )
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (

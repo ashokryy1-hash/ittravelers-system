@@ -245,7 +245,7 @@ export default function PdfContractUpload({ onClose, onSaved }: Props) {
             <div className="p-8 flex flex-col items-center gap-4">
               <div
                 onClick={() => fileRef.current?.click()}
-                className="w-full border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer hover:border-teal-400 hover:bg-teal-50 transition-colors"
+                className="w-full border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer hover:border-terracotta-400 hover:bg-terracotta-50 transition-colors"
               >
                 <FileText size={40} className="text-gray-300" />
                 <div className="text-center">
@@ -267,7 +267,7 @@ export default function PdfContractUpload({ onClose, onSaved }: Props) {
           {/* Extracting step */}
           {step === 'extracting' && (
             <div className="p-10 flex flex-col items-center gap-4">
-              <Loader size={36} className="text-teal-500 animate-spin" />
+              <Loader size={36} className="text-terracotta-500 animate-spin" />
               <div className="text-center">
                 <p className="font-medium text-gray-700">Reading {fileName}…</p>
                 <p className="text-sm text-gray-400 mt-1">Claude AI is extracting hotel details, room types, and rates</p>
@@ -296,7 +296,7 @@ export default function PdfContractUpload({ onClose, onSaved }: Props) {
 
               {(!existingMatch || action) && (
                 <>
-                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm text-teal-700">
+                  <div className="bg-terracotta-50 border border-terracotta-200 rounded-lg p-3 text-sm text-terracotta-700">
                     ✓ AI extracted the data below. Review everything carefully, edit if needed, then click Save.
                   </div>
 
@@ -418,7 +418,7 @@ export default function PdfContractUpload({ onClose, onSaved }: Props) {
           {/* Saving step */}
           {step === 'saving' && (
             <div className="p-10 flex flex-col items-center gap-4">
-              <Loader size={36} className="text-teal-500 animate-spin" />
+              <Loader size={36} className="text-terracotta-500 animate-spin" />
               <p className="text-gray-600">Saving to your rate directory…</p>
             </div>
           )}
@@ -426,8 +426,8 @@ export default function PdfContractUpload({ onClose, onSaved }: Props) {
           {/* Done step */}
           {step === 'done' && (
             <div className="p-10 flex flex-col items-center gap-4">
-              <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center">
-                <Check size={32} className="text-teal-600" />
+              <div className="w-16 h-16 bg-terracotta-100 rounded-full flex items-center justify-center">
+                <Check size={32} className="text-terracotta-600" />
               </div>
               <div className="text-center">
                 <p className="font-semibold text-gray-800 text-lg">{editedHotel?.name} saved!</p>
@@ -442,7 +442,7 @@ export default function PdfContractUpload({ onClose, onSaved }: Props) {
                 </button>
                 <button
                   onClick={() => { onSaved(); onClose() }}
-                  className="text-sm bg-teal-600 text-white rounded-lg px-4 py-2 hover:bg-teal-700"
+                  className="text-sm bg-terracotta-600 text-white rounded-lg px-4 py-2 hover:bg-terracotta-700"
                 >
                   Go to Rate Directory
                 </button>
@@ -459,7 +459,7 @@ export default function PdfContractUpload({ onClose, onSaved }: Props) {
             </button>
             <button
               onClick={save}
-              className="text-sm bg-teal-600 text-white rounded-lg px-6 py-2 hover:bg-teal-700 font-medium"
+              className="text-sm bg-terracotta-600 text-white rounded-lg px-6 py-2 hover:bg-terracotta-700 font-medium"
             >
               Save to Rate Directory
             </button>
@@ -491,4 +491,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400 bg-white'

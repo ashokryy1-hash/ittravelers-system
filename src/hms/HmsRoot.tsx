@@ -15,7 +15,7 @@ export default function HmsRoot() {
 
   if (session === undefined) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-terracotta-900 flex items-center justify-center">
         <div className="text-white text-sm">Loading…</div>
       </div>
     )

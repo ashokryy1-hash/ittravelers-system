@@ -75,7 +75,7 @@ const PRIORITIES = [
 
 const SOURCES = ['Marketing', 'Instagram', 'Facebook', 'Referral', 'Website', 'WhatsApp', 'Walk-in', 'Other']
 const DESTINATIONS = ['Bali', 'Thailand', 'Vietnam', 'Maldives', 'Other']
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400'
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400'
 
 // ─── WhatsApp message builders ────────────────────────────────────────────────
 
@@ -284,7 +284,7 @@ export default function LeadsScreen() {
         </div>
         <button
           onClick={() => setShowNew(true)}
-          className="flex items-center gap-2 bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-700"
+          className="flex items-center gap-2 bg-terracotta-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-terracotta-700"
         >
           <Plus size={15} /> Add Lead
         </button>
@@ -294,7 +294,7 @@ export default function LeadsScreen() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Honeymoon Leads', value: stats.honeymoon, color: 'text-pink-600' },
-          { label: 'Group Trip Leads', value: stats.group, color: 'text-teal-600' },
+          { label: 'Group Trip Leads', value: stats.group, color: 'text-terracotta-600' },
           { label: 'Total Booked', value: stats.bookedTotal, color: 'text-green-600' },
           { label: 'Need Follow-up', value: stats.needsAttention, color: stats.needsAttention > 0 ? 'text-orange-500' : 'text-slate-400' },
         ].map(s => (
@@ -316,7 +316,7 @@ export default function LeadsScreen() {
             key={t.key}
             onClick={() => setTab(t.key as any)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.key ? 'border-teal-500 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+              tab === t.key ? 'border-terracotta-500 text-terracotta-600' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             {t.label}
@@ -364,7 +364,7 @@ function HoneymoonTab({ leads, trips, settings, isLoading }: { leads: Lead[]; tr
           const count = s === 'All' ? leads.length : leads.filter(l => l.status === s).length
           return (
             <button key={s} onClick={() => setFilterStatus(s as any)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filterStatus === s ? 'bg-teal-600 text-white' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'}`}>
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filterStatus === s ? 'bg-terracotta-600 text-white' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'}`}>
               {s}{count > 0 && ` (${count})`}
             </button>
           )
@@ -373,7 +373,7 @@ function HoneymoonTab({ leads, trips, settings, isLoading }: { leads: Lead[]; tr
       <div className="relative mb-4">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or phone…"
-          className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+          className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400" />
       </div>
       {isLoading ? <div className="text-slate-400 text-sm">Loading…</div>
         : !filtered.length ? (
@@ -412,14 +412,14 @@ function GroupTab({ leads, trips, settings, isLoading }: { leads: Lead[]; trips:
       {/* Trip filter */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
         <button onClick={() => setFilterTrip('All')}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium ${filterTrip === 'All' ? 'bg-teal-600 text-white' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'}`}>
+          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium ${filterTrip === 'All' ? 'bg-terracotta-600 text-white' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'}`}>
           All trips ({leads.length})
         </button>
         {trips.map(t => {
           const count = leads.filter(l => l.trip_id === t.id).length
           return (
             <button key={t.id} onClick={() => setFilterTrip(t.id)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium ${filterTrip === t.id ? 'bg-teal-600 text-white' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'}`}>
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium ${filterTrip === t.id ? 'bg-terracotta-600 text-white' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'}`}>
               {t.name} ({count})
             </button>
           )
@@ -430,10 +430,10 @@ function GroupTab({ leads, trips, settings, isLoading }: { leads: Lead[]; trips:
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
-            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400" />
         </div>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-400">
           <option value="All">All stages</option>
           {STATUSES.map(s => <option key={s}>{s}</option>)}
         </select>
@@ -502,7 +502,7 @@ function TripLibraryTab({ trips, leads, isLoading }: { trips: Trip[]; leads: Lea
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-slate-500">Create group trips — leads link to a trip and inherit its details in WhatsApp messages</p>
         <button onClick={() => setShowNew(s => !s)}
-          className="flex items-center gap-2 border border-teal-600 text-teal-600 rounded-lg px-3 py-1.5 text-sm hover:bg-teal-50">
+          className="flex items-center gap-2 border border-terracotta-600 text-terracotta-600 rounded-lg px-3 py-1.5 text-sm hover:bg-terracotta-50">
           <Plus size={14} /> New Trip
         </button>
       </div>
@@ -556,7 +556,7 @@ function TripLibraryTab({ trips, leads, isLoading }: { trips: Trip[]; leads: Lea
                     ...f,
                     description: `🌟 What's included:\n• {nights} nights accommodation at {hotel_type} hotel\n• {meals} meal plan\n• {tours_count} guided tours & day trips\n• Airport transfers (arrival & departure)\n• {extra}\n\n⚠️ Not included: International flights & visa fees`
                   }))}
-                  className="text-xs text-teal-600 hover:text-teal-700 font-medium border border-teal-200 px-2 py-0.5 rounded"
+                  className="text-xs text-terracotta-600 hover:text-terracotta-700 font-medium border border-terracotta-200 px-2 py-0.5 rounded"
                 >
                   Use Template
                 </button>
@@ -581,7 +581,7 @@ function TripLibraryTab({ trips, leads, isLoading }: { trips: Trip[]; leads: Lea
           </div>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowNew(false)} className="text-sm text-slate-500 px-4 py-2">Cancel</button>
-            <button onClick={saveTrip} disabled={saving} className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50">
+            <button onClick={saveTrip} disabled={saving} className="bg-terracotta-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50">
               {saving ? 'Saving…' : 'Create Trip'}
             </button>
           </div>
@@ -612,7 +612,7 @@ function TripLibraryTab({ trips, leads, isLoading }: { trips: Trip[]; leads: Lea
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-slate-800">🌴 {trip.name}</span>
                         {daysUntil !== null && daysUntil > 0 && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${daysUntil < 30 ? 'bg-orange-100 text-orange-700' : 'bg-teal-100 text-teal-700'}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${daysUntil < 30 ? 'bg-orange-100 text-orange-700' : 'bg-terracotta-100 text-terracotta-700'}`}>
                             {daysUntil}d to go
                           </span>
                         )}
@@ -628,7 +628,7 @@ function TripLibraryTab({ trips, leads, isLoading }: { trips: Trip[]; leads: Lea
                     <div className="flex items-center gap-2 shrink-0">
                       {trip.program_link && (
                         <a href={trip.program_link} target="_blank" rel="noreferrer"
-                          className="flex items-center gap-1 text-xs text-teal-600 border border-teal-200 px-2 py-1 rounded-lg hover:bg-teal-50">
+                          className="flex items-center gap-1 text-xs text-terracotta-600 border border-terracotta-200 px-2 py-1 rounded-lg hover:bg-terracotta-50">
                           <Link size={11} /> Program
                         </a>
                       )}
@@ -644,7 +644,7 @@ function TripLibraryTab({ trips, leads, isLoading }: { trips: Trip[]; leads: Lea
                       <span>{booked} confirmed / {trip.capacity} total</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${Math.min(100, (booked / trip.capacity) * 100)}%` }} />
+                      <div className="h-full bg-terracotta-500 rounded-full transition-all" style={{ width: `${Math.min(100, (booked / trip.capacity) * 100)}%` }} />
                     </div>
                   </div>
                 </div>
@@ -748,7 +748,7 @@ function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSe
   } else if (needsFollowUp) {
     actionBtn = <button onClick={sendReminder} disabled={!!sending} className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs px-3 py-1.5 rounded-lg font-medium animate-pulse"><Bell size={13} /> {sending ? 'Sending…' : 'Send Reminder'}</button>
   } else if (isGroup && lead.status === 'Replied') {
-    actionBtn = <button onClick={sendDeposit} disabled={!!sending} className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white text-xs px-3 py-1.5 rounded-lg font-medium"><Send size={13} /> {sending ? 'Sending…' : 'Send Deposit Info'}</button>
+    actionBtn = <button onClick={sendDeposit} disabled={!!sending} className="flex items-center gap-1.5 bg-terracotta-600 hover:bg-terracotta-700 disabled:opacity-60 text-white text-xs px-3 py-1.5 rounded-lg font-medium"><Send size={13} /> {sending ? 'Sending…' : 'Send Deposit Info'}</button>
   } else if (!isGroup && needsMeetingLink) {
     actionBtn = <button onClick={sendMeetingLink} disabled={!!sending} className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-xs px-3 py-1.5 rounded-lg font-medium"><Send size={13} /> {sending ? 'Sending…' : 'Send Meeting Link'}</button>
   } else if (!isGroup && lead.status === 'Meeting') {
@@ -762,7 +762,7 @@ function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSe
     {showEdit && <EditLeadModal lead={lead} trips={trips} onClose={() => setShowEdit(false)} />}
     <div className={`border rounded-xl bg-white overflow-hidden ${lead.status === 'Lost' ? 'opacity-60' : 'border-gray-200'}`}>
       <div className="flex items-center gap-3 px-4 py-3">
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${isGroup ? 'bg-teal-100 text-teal-700' : 'bg-pink-100 text-pink-700'}`}>
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${isGroup ? 'bg-terracotta-100 text-terracotta-700' : 'bg-pink-100 text-pink-700'}`}>
           {lead.name.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
@@ -770,7 +770,7 @@ function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSe
             <span className="font-semibold text-slate-800">{lead.name}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[lead.status]}`}>{lead.status}</span>
             {lead.priority && (() => { const p = PRIORITIES.find(p => p.value === lead.priority); return p ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${p.bg}`}>{p.label}</span> : null })()}
-            {isGroup && trip && <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">🌴 {trip.name}</span>}
+            {isGroup && trip && <span className="text-xs bg-terracotta-50 text-terracotta-700 px-2 py-0.5 rounded-full">🌴 {trip.name}</span>}
             {lead.status === 'New' && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium animate-pulse">Not contacted</span>}
             {needsFollowUp && <span className="flex items-center gap-1 text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium animate-pulse"><Bell size={10} /> Follow up needed</span>}
           </div>
@@ -808,7 +808,7 @@ function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSe
             <div className="flex flex-wrap gap-1.5">
               {STATUSES.map(s => (
                 <button key={s} onClick={() => setStatus(s)}
-                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${lead.status === s ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-300 text-slate-600 hover:bg-gray-50'}`}>
+                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${lead.status === s ? 'bg-terracotta-600 text-white border-terracotta-600' : 'border-gray-300 text-slate-600 hover:bg-gray-50'}`}>
                   {s}
                 </button>
               ))}
@@ -906,7 +906,7 @@ function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSe
               <div className="space-y-2">
                 <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className={`${inp} resize-none`} autoFocus />
                 <div className="flex gap-2">
-                  <button onClick={saveNotes} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700">Save</button>
+                  <button onClick={saveNotes} className="text-xs bg-terracotta-600 text-white px-3 py-1.5 rounded-lg hover:bg-terracotta-700">Save</button>
                   <button onClick={() => setEditNotes(false)} className="text-xs text-slate-500 px-3 py-1.5">Cancel</button>
                 </div>
               </div>
@@ -918,7 +918,7 @@ function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSe
           </div>
 
           <div className="flex justify-between pt-1">
-            <button onClick={() => setShowEdit(true)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-teal-600">
+            <button onClick={() => setShowEdit(true)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-terracotta-600">
               <Edit2 size={12} /> Edit lead
             </button>
             <button onClick={deleteLead} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600">
@@ -1065,7 +1065,7 @@ function EditLeadModal({ lead, trips, onClose }: { lead: Lead; trips: Trip[]; on
 
         <div className="flex gap-2 justify-end px-6 pb-6">
           <button onClick={onClose} className="text-sm text-slate-500 px-4 py-2">Cancel</button>
-          <button onClick={save} disabled={saving} className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50">
+          <button onClick={save} disabled={saving} className="bg-terracotta-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50">
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
@@ -1078,7 +1078,7 @@ function EditLeadModal({ lead, trips, onClose }: { lead: Lead; trips: Trip[]; on
 
 const COLOR_MAP = {
   green: { bg: 'bg-green-50', border: 'border-green-100', btn: 'bg-green-500 hover:bg-green-600', badge: 'bg-green-100 text-green-700' },
-  teal: { bg: 'bg-teal-50', border: 'border-teal-100', btn: 'bg-teal-600 hover:bg-teal-700', badge: 'bg-teal-100 text-teal-700' },
+  teal: { bg: 'bg-terracotta-50', border: 'border-terracotta-100', btn: 'bg-terracotta-600 hover:bg-terracotta-700', badge: 'bg-terracotta-100 text-terracotta-700' },
   purple: { bg: 'bg-purple-50', border: 'border-purple-100', btn: 'bg-purple-600 hover:bg-purple-700', badge: 'bg-purple-100 text-purple-700' },
   rose: { bg: 'bg-rose-50', border: 'border-rose-100', btn: 'bg-rose-500 hover:bg-rose-600', badge: 'bg-rose-100 text-rose-700' },
   orange: { bg: 'bg-orange-50', border: 'border-orange-100', btn: 'bg-orange-500 hover:bg-orange-600', badge: 'bg-orange-100 text-orange-700' },
@@ -1101,7 +1101,7 @@ function PackageLinkField({ lead }: { lead: Lead }) {
   return (
     <div className="flex gap-2">
       <input
-        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal-400"
+        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-terracotta-400"
         placeholder="Paste sample itinerary link (Google Drive, PDF, etc.)"
         value={link}
         onChange={e => setLink(e.target.value)}
@@ -1167,7 +1167,7 @@ function MeetingSection({ lead }: { lead: Lead }) {
   if (!lead.meeting_type && !editing) return (
     <div>
       <div className="text-xs font-medium text-slate-500 mb-1">Meeting:</div>
-      <button onClick={() => setEditing(true)} className="text-xs text-teal-600 hover:underline">+ Schedule a meeting</button>
+      <button onClick={() => setEditing(true)} className="text-xs text-terracotta-600 hover:underline">+ Schedule a meeting</button>
     </div>
   )
 
@@ -1181,7 +1181,7 @@ function MeetingSection({ lead }: { lead: Lead }) {
         <input type="datetime-local" value={date} onChange={e => setDate(e.target.value)} className={inp} />
       </div>
       <div className="flex gap-2">
-        <button onClick={save} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700">Save</button>
+        <button onClick={save} className="text-xs bg-terracotta-600 text-white px-3 py-1.5 rounded-lg hover:bg-terracotta-700">Save</button>
         <button onClick={() => setEditing(false)} className="text-xs text-slate-500">Cancel</button>
       </div>
     </div>
@@ -1195,7 +1195,7 @@ function MeetingSection({ lead }: { lead: Lead }) {
           {lead.meeting_type === 'Google Meet' ? '💻' : '🏢'} {lead.meeting_type}
           {lead.meeting_date && ` — ${format(parseISO(lead.meeting_date), 'd MMM yyyy, HH:mm')}`}
         </span>
-        <button onClick={() => setEditing(true)} className="text-xs text-teal-600 hover:underline">Edit</button>
+        <button onClick={() => setEditing(true)} className="text-xs text-terracotta-600 hover:underline">Edit</button>
       </div>
     </div>
   )
@@ -1319,8 +1319,8 @@ function NewLeadModal({ trips, defaultType, onClose }: { trips: Trip[]; defaultT
           </div>
 
           {previewMsg && (
-            <div className={`rounded-xl p-3 border ${leadType === 'group' ? 'bg-teal-50 border-teal-100' : 'bg-green-50 border-green-100'}`}>
-              <div className={`text-xs font-medium mb-1 ${leadType === 'group' ? 'text-teal-700' : 'text-green-700'}`}>📱 WhatsApp message preview:</div>
+            <div className={`rounded-xl p-3 border ${leadType === 'group' ? 'bg-terracotta-50 border-terracotta-100' : 'bg-green-50 border-green-100'}`}>
+              <div className={`text-xs font-medium mb-1 ${leadType === 'group' ? 'text-terracotta-700' : 'text-green-700'}`}>📱 WhatsApp message preview:</div>
               <pre className="text-xs text-slate-600 whitespace-pre-wrap font-sans line-clamp-5">{previewMsg}</pre>
             </div>
           )}
@@ -1328,7 +1328,7 @@ function NewLeadModal({ trips, defaultType, onClose }: { trips: Trip[]; defaultT
 
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="text-sm text-slate-500 px-4 py-2 hover:text-slate-700">Cancel</button>
-          <button onClick={save} disabled={saving} className="bg-teal-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50">
+          <button onClick={save} disabled={saving} className="bg-terracotta-600 text-white text-sm rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50">
             {saving ? 'Saving…' : 'Add Lead'}
           </button>
         </div>
