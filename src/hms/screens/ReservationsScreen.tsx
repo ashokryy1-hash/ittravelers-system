@@ -35,7 +35,7 @@ function buildEmailTemplate(type: 'availability' | 'confirm' | 'payment' | 'canc
   const checkout = booking.checkout_date
   const nights = booking.nights
   const sig = settings.agency_signature ?? 'ITTravelers\nAhmed Shokry – Operations Manager'
-  const toEmail = hotel?.reservation_email || hotel?.contact_email || ''
+  const toEmail = hotel?.contact_email || ''
   const seasonNote = season !== 'Low' ? ` (${season} Season)` : ''
 
   if (type === 'availability') {
@@ -171,7 +171,7 @@ export default function ReservationsScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('hms_bookings')
-        .select('*, cutoff_date, hms_hotels(name, contact_email, reservation_email, city, surcharge_waiver, destination_id), hms_room_types(name, room_category, meal_plan, currency, low_season_rate, high_season_rate, peak_season_rate)')
+        .select('*, hms_hotels(name, contact_email, city, surcharge_waiver, destination_id), hms_room_types(name, room_category, meal_plan, currency, low_season_rate, high_season_rate, peak_season_rate)')
         .order('checkin_date')
       return data ?? []
     },
@@ -231,7 +231,7 @@ Agency signature: ${settings.agency_signature}`
       const data = await res.json()
       const body = data.text ?? ''
       toast.dismiss('draft')
-      const toEmail = hotel?.reservation_email || hotel?.contact_email || ''
+      const toEmail = hotel?.contact_email || ''
       setEmailDraft({
         to: toEmail,
         subject: `Availability Request — ${booking.checkin_date} to ${booking.checkout_date}`,
