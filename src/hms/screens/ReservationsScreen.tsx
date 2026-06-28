@@ -730,8 +730,10 @@ function Detail({ label, value }: { label: string; value: string | null | undefi
 
 // ---- Booking Form ----
 function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => void; onSaved: () => void; existingClients: string[] }) {
+  const [hotelMode, setHotelMode] = useState<'contract' | 'manual'>('contract')
   const [form, setForm] = useState({
     client_name: '', hotel_id: '', room_type_id: '',
+    manual_hotel_name: '', manual_room_type: '',
     checkin_date: '', checkout_date: '', meal_plan: '',
     rate_per_night: '', currency: 'IDR', notes: '',
     status: 'Availability pending',
@@ -804,6 +806,10 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
   }
 
   async function save() {
+    if (!form.client_name.trim()) return toast.error('Client name required')
+    if (hotelMode === 'contract' && !form.hotel_id) return toast.error('Please select a hotel')
+    if (hotelMode === 'manual' && !form.manual_hotel_name.trim()) return toast.error('Please enter hotel name')
+    if (!form.checkin_date || !form.checkout_date) return toast.error('Dates required')
     setSaving(true)
     const nights = nightsBetween(form.checkin_date, form.checkout_date)
     const rate = parseFloat(form.rate_per_night) || 0
@@ -814,8 +820,14 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
       : form.currency === 'THB' ? totalIdr * parseFloat(settings.THB_to_EGP)
       : totalIdr * parseFloat(settings.USD_to_EGP)
 
+    const payload = hotelMode === 'manual'
+      ? { ...form, hotel_id: null, room_type_id: null, notes: `Hotel: ${form.manual_hotel_name}${form.manual_room_type ? ` | Room: ${form.manual_room_type}` : ''}${form.notes ? `\n${form.notes}` : ''}` }
+      : { ...form }
+
     await supabase.from('hms_bookings').insert({
-      ...form,
+      ...payload,
+      manual_hotel_name: hotelMode === 'manual' ? form.manual_hotel_name : null,
+      manual_room_type: hotelMode === 'manual' ? form.manual_room_type : null,
       rate_per_night: rate,
       nights,
       total_price_idr: totalIdr,
@@ -842,21 +854,46 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
             {existingClients.sort().map(name => <option key={name} value={name} />)}
           </datalist>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Hotel *</label>
-          <select className={inp} value={form.hotel_id} onChange={set('hotel_id')}>
-            <option value="">Select hotel…</option>
-            {hotels?.map(h => <option key={h.id} value={h.id}>{h.name} ({h.city})</option>)}
-          </select>
+        {/* Hotel mode toggle */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+          {(['contract', 'manual'] as const).map(mode => (
+            <button key={mode} type="button" onClick={() => { setHotelMode(mode); setForm(f => ({ ...f, hotel_id: '', room_type_id: '', manual_hotel_name: '', manual_room_type: '' })) }}
+              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${hotelMode === mode ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+              {mode === 'contract' ? '📋 From Contracts' : '✏️ Enter Manually'}
+            </button>
+          ))}
         </div>
-        {form.hotel_id && (
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Room type</label>
-            <select className={inp} value={form.room_type_id} onChange={handleRoomSelect}>
-              <option value="">Select room…</option>
-              {rooms?.map(r => <option key={r.id} value={r.id}>{r.name} ({r.meal_plan})</option>)}
-            </select>
-          </div>
+
+        {hotelMode === 'contract' ? (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Hotel *</label>
+              <select className={inp} value={form.hotel_id} onChange={set('hotel_id')}>
+                <option value="">Select hotel…</option>
+                {hotels?.map(h => <option key={h.id} value={h.id}>{h.name} ({h.city})</option>)}
+              </select>
+            </div>
+            {form.hotel_id && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Room type</label>
+                <select className={inp} value={form.room_type_id} onChange={handleRoomSelect}>
+                  <option value="">Select room…</option>
+                  {rooms?.map(r => <option key={r.id} value={r.id}>{r.name} ({r.meal_plan})</option>)}
+                </select>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Hotel name *</label>
+              <input className={inp} placeholder="e.g. Four Seasons Bali at Sayan" value={form.manual_hotel_name} onChange={set('manual_hotel_name')} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Room type</label>
+              <input className={inp} placeholder="e.g. Deluxe Pool Villa" value={form.manual_room_type} onChange={set('manual_room_type')} />
+            </div>
+          </>
         )}
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -909,7 +946,7 @@ function BookingForm({ onClose, onSaved, existingClients }: { onClose: () => voi
         <button onClick={onClose} className="text-sm border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50">Cancel</button>
         <button
           onClick={save}
-          disabled={saving || !form.client_name || !form.hotel_id || !form.checkin_date || !form.checkout_date}
+          disabled={saving || !form.client_name || !form.checkin_date || !form.checkout_date || (hotelMode === 'contract' && !form.hotel_id) || (hotelMode === 'manual' && !form.manual_hotel_name)}
           className="text-sm bg-teal-600 text-white rounded-lg px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Create Booking'}
