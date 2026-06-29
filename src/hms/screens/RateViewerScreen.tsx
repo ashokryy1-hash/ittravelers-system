@@ -116,17 +116,25 @@ export default function RateViewerScreen() {
   // Reset area when destination changes
   useEffect(() => { setArea('') }, [destination])
 
-  // Load session quote from localStorage on mount
+  // Load session quote from localStorage — wait until hotels/rooms/rules are all loaded
+  const [pendingQuote, setPendingQuote] = useState<SessionHotelItem[] | null>(null)
+
   useEffect(() => {
     const raw = localStorage.getItem('trip_explorer_quote')
     if (!raw) return
     localStorage.removeItem('trip_explorer_quote')
-    let items: SessionHotelItem[]
-    try { items = JSON.parse(raw) } catch { return }
-    if (!items.length) return
-    runSessionQuote(items)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      const items: SessionHotelItem[] = JSON.parse(raw)
+      if (items.length) setPendingQuote(items)
+    } catch {}
   }, [])
+
+  useEffect(() => {
+    if (!pendingQuote || !hotels?.length || !rooms?.length) return
+    setPendingQuote(null)
+    runSessionQuote(pendingQuote)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingQuote, hotels, rooms])
 
   async function runSessionQuote(items: SessionHotelItem[]) {
     setSessionLoading(true)
