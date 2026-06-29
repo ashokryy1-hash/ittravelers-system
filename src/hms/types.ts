@@ -134,6 +134,7 @@ export interface HmsSettings {
   google_meet_link: string
   calendly_link: string
   office_address: string
+  sample_package_link: string
 }
 
 export type Season = 'low' | 'high' | 'peak'

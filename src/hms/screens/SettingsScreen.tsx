@@ -101,6 +101,9 @@ export default function SettingsScreen() {
         <Field label="Office address" description="Sent automatically when a lead chooses office meeting">
           <input className={inp} value={(form as any).office_address ?? ''} onChange={set('office_address' as any)} placeholder="e.g. 15 Tahrir St, Dokki, Cairo" />
         </Field>
+        <Field label="Sample package link" description="Shared in the Day 5 WhatsApp message — set once, used for all clients automatically">
+          <input className={inp} value={(form as any).sample_package_link ?? ''} onChange={set('sample_package_link' as any)} placeholder="https://drive.google.com/… or any link" />
+        </Field>
       </Section>
 
       <Section title="Reminders">

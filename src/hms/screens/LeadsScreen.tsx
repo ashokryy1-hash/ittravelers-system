@@ -201,15 +201,15 @@ Whenever you start thinking about your honeymoon, I'd be happy to help you build
 If you're still interested, just send me a quick "yes" and we'll continue from there.`
 }
 
-function buildHoneymoonReminderDay5(lead: Lead): string {
+function buildHoneymoonReminderDay5(lead: Lead, globalPackageLink?: string): string {
   const name = lead.name.split(' ')[0]
-  const packageLink = (lead as any).package_link
+  const packageLink = (lead as any).package_link || globalPackageLink
   return `Hi ${name}! 😊
 
 I know you may still be busy with wedding planning, so this will be my last message. 🤍
 
 I wanted to share a real honeymoon package we've designed to give you some inspiration:
-${packageLink || '[Add a package link to this lead]'}
+${packageLink || '[Add a package link in Settings → Sample package link]'}
 
 Every couple is different, which is why we don't sell fixed packages — we build each honeymoon from scratch to match your travel style, budget, and the memories you want to create.
 
@@ -722,7 +722,7 @@ function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSe
     'Reminder Day 2'
   )
   const sendReminderDay5 = () => sendViaAPI(
-    buildHoneymoonReminderDay5(lead),
+    buildHoneymoonReminderDay5(lead, settings?.sample_package_link),
     'Reminder Day 5'
   )
   const sendMeetingLink = () => settings && sendViaAPI(buildMeetingLinkMessage(lead, settings), 'Meeting link', { status: 'Meeting' })
@@ -853,9 +853,9 @@ function LeadCard({ lead, settings, trip, trips }: { lead: Lead; settings: HmsSe
                 </div>
                 <PackageLinkField lead={lead} />
                 <MessageBlock step="3" label="Day 5 — Sample Package" color="rose" sent={false}
-                  message={buildHoneymoonReminderDay5(lead)}
+                  message={buildHoneymoonReminderDay5(lead, settings?.sample_package_link)}
                   onSend={sendReminderDay5}
-                  onManual={() => window.open(buildWhatsAppLink(lead.phone, buildHoneymoonReminderDay5(lead)), '_blank')}
+                  onManual={() => window.open(buildWhatsAppLink(lead.phone, buildHoneymoonReminderDay5(lead, settings?.sample_package_link)), '_blank')}
                   sending={sending === 'Reminder Day 5'}
                   hint={daysSinceUpdate >= 5 ? `⚠️ ${daysSinceUpdate}d no reply — last message` : 'Last message before stopping'} />
               </div>
@@ -1087,28 +1087,45 @@ const COLOR_MAP = {
 
 function PackageLinkField({ lead }: { lead: Lead }) {
   const qc = useQueryClient()
-  const [link, setLink] = useState(lead.package_link ?? '')
+  const { data: settings } = useQuery({ queryKey: ['hms_settings'], queryFn: getSettings })
+  const globalLink = settings?.sample_package_link ?? ''
+  const effectiveLink = lead.package_link ?? globalLink
+  const [link, setLink] = useState(effectiveLink)
   const [saving, setSaving] = useState(false)
+
+  // Sync when global setting loads
+  useState(() => { if (!lead.package_link && globalLink) setLink(globalLink) })
+
+  const isUsingGlobal = !lead.package_link && !!globalLink
 
   async function save() {
     setSaving(true)
     await supabase.from('hms_leads').update({ package_link: link.trim() || null }).eq('id', lead.id)
     qc.invalidateQueries({ queryKey: ['hms_leads'] })
     setSaving(false)
-    toast.success('Package link saved')
+    toast.success('Package link saved for this client')
   }
 
   return (
-    <div className="flex gap-2">
-      <input
-        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-terracotta-400"
-        placeholder="Paste sample itinerary link (Google Drive, PDF, etc.)"
-        value={link}
-        onChange={e => setLink(e.target.value)}
-      />
-      <button onClick={save} disabled={saving} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg">
-        {saving ? 'Saving…' : 'Save'}
-      </button>
+    <div className="space-y-1">
+      {isUsingGlobal && (
+        <p className="text-xs text-emerald-600 flex items-center gap-1">
+          ✓ Using global package link from Settings — no action needed
+        </p>
+      )}
+      <div className="flex gap-2">
+        <input
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-terracotta-400"
+          placeholder={globalLink ? globalLink : 'Paste sample itinerary link (Google Drive, PDF, etc.)'}
+          value={link}
+          onChange={e => setLink(e.target.value)}
+        />
+        {link !== globalLink && (
+          <button onClick={save} disabled={saving} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg">
+            {saving ? 'Saving…' : 'Override'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

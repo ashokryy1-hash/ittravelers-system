@@ -14,6 +14,7 @@ export async function getSettings(): Promise<HmsSettings> {
     agency_signature: map.agency_signature ?? '',
     google_places_api_key: map.google_places_api_key ?? '',
     followup_reminder_days: map.followup_reminder_days ?? '7',
+    sample_package_link: map.sample_package_link ?? '',
   }
 }
 
