@@ -83,37 +83,14 @@ export default function RatesScreen() {
 
       <div className="space-y-2">
         {hotels?.map(hotel => (
-          <div key={hotel.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3">
-              <button
-                className="flex items-center gap-2 flex-1 text-left"
-                onClick={() => setExpanded(expanded === hotel.id ? null : hotel.id)}
-              >
-                {expanded === hotel.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <div>
-                  <span className="font-medium text-slate-800">{hotel.name}</span>
-                  <span className="ml-2 text-xs text-slate-500">
-                    {(hotel as any).hms_destinations?.name} · {hotel.city} · {'★'.repeat(hotel.star_rating ?? 0)}
-                  </span>
-                </div>
-              </button>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${contractBadge(hotel.contract_status)}`}>
-                  {hotel.contract_status}
-                </span>
-                <button onClick={() => { setEditHotel(hotel); setShowForm(true) }} className="text-slate-400 hover:text-slate-600 p-1">
-                  <Edit2 size={14} />
-                </button>
-                <button onClick={() => deleteHotel.mutate(hotel.id)} className="text-slate-400 hover:text-red-500 p-1">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-
-            {expanded === hotel.id && (
-              <HotelDetail hotel={hotel} />
-            )}
-          </div>
+          <HotelRow
+            key={hotel.id}
+            hotel={hotel}
+            expanded={expanded === hotel.id}
+            onToggle={() => setExpanded(expanded === hotel.id ? null : hotel.id)}
+            onEdit={() => { setEditHotel(hotel); setShowForm(true) }}
+            onDelete={() => deleteHotel.mutate(hotel.id)}
+          />
         ))}
       </div>
 
@@ -139,6 +116,78 @@ export default function RatesScreen() {
           onSaved={() => { setShowPdfUpload(false); qc.invalidateQueries({ queryKey: ['hms_hotels'] }) }}
         />
       )}
+    </div>
+  )
+}
+
+function HotelRow({ hotel, expanded, onToggle, onEdit, onDelete }: {
+  hotel: HmsHotel
+  expanded: boolean
+  onToggle: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const { data: rooms } = useQuery<HmsRoomType[]>({
+    queryKey: ['hms_rooms', hotel.id],
+    queryFn: async () => {
+      const { data } = await supabase.from('hms_room_types').select('*').eq('hotel_id', hotel.id).order('sort_order')
+      return data ?? []
+    },
+  })
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3">
+        <button
+          className="flex items-center gap-2 flex-1 text-left min-w-0"
+          onClick={onToggle}
+        >
+          {expanded ? <ChevronDown size={16} className="shrink-0 text-slate-400" /> : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-slate-800">{hotel.name}</span>
+              <span className="text-xs text-slate-400">{(hotel as any).hms_destinations?.name} · {hotel.city}{hotel.star_rating ? ' · ' + '★'.repeat(hotel.star_rating) : ''}</span>
+              {hotel.surcharge_waiver && hotel.surcharge_waiver !== 'none' && (
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{hotel.surcharge_waiver} surcharge waiver</span>
+              )}
+            </div>
+            {/* Room prices preview */}
+            {rooms && rooms.length > 0 && (
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                {rooms.map(r => (
+                  <span key={r.id} className="text-xs text-slate-500">
+                    <span className="font-medium text-slate-700">{r.name}</span>
+                    {' · '}
+                    {r.currency} {r.low_season_rate?.toLocaleString() ?? '—'}
+                    {r.high_season_rate ? ` / ${r.high_season_rate.toLocaleString()}` : ''}
+                    {r.peak_season_rate ? ` / ${r.peak_season_rate.toLocaleString()}` : ''}
+                    <span className="text-slate-400"> /night</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            {rooms && rooms.length === 0 && (
+              <span className="text-xs text-amber-500 italic">No room types yet — click to add</span>
+            )}
+          </div>
+        </button>
+        <div className="flex items-center gap-2 shrink-0 ml-3">
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${contractBadge(hotel.contract_status)}`}>
+            {hotel.contract_status}
+          </span>
+          <button
+            onClick={onEdit}
+            className="flex items-center gap-1 text-xs text-terracotta-600 hover:text-terracotta-700 border border-terracotta-200 hover:border-terracotta-400 rounded-lg px-2.5 py-1 transition-colors"
+          >
+            <Edit2 size={12} /> Edit
+          </button>
+          <button onClick={onDelete} className="text-slate-300 hover:text-red-500 p-1 transition-colors">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+
+      {expanded && <HotelDetail hotel={hotel} />}
     </div>
   )
 }
