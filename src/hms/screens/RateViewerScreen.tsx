@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Copy, ChevronLeft, ChevronRight, Sparkles, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Copy, ChevronLeft, ChevronRight, Sparkles, AlertTriangle, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { HmsHotel, HmsRoomType, HmsSurchargeRule, RateQuoteResult } from '../types'
 import { getSeasonForStay, getSurcharge, seasonLabel, nightsBetween } from '../lib/season'
@@ -79,6 +79,7 @@ export default function RateViewerScreen() {
   const [area, setArea] = useState('')
   const [maxBudget, setMaxBudget] = useState('')
   const [results, setResults] = useState<RateQuoteResult[] | null>(null)
+  const [resultsSearch, setResultsSearch] = useState('')
   const [searching, setSearching] = useState(false)
   const [sessionRows, setSessionRows] = useState<SessionQuoteRow[] | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
@@ -334,17 +335,38 @@ export default function RateViewerScreen() {
       {/* Results */}
       {results !== null && (
         <div>
-          <p className="text-sm text-slate-500 mb-3">
-            {results.length} result{results.length !== 1 ? 's' : ''} · {nightsBetween(checkin, checkout)} nights
-            {results[0] && <> · <span className="font-medium">{seasonLabel(results[0].season)} season</span></>}
-          </p>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <p className="text-sm text-slate-500">
+              {results.length} result{results.length !== 1 ? 's' : ''} · {nightsBetween(checkin, checkout)} nights
+              {results[0] && <> · <span className="font-medium">{seasonLabel(results[0].season)} season</span></>}
+            </p>
+            {results.length > 3 && (
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={resultsSearch}
+                  onChange={e => setResultsSearch(e.target.value)}
+                  placeholder="Filter by hotel name…"
+                  className="pl-8 pr-8 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 w-56"
+                />
+                {resultsSearch && (
+                  <button onClick={() => setResultsSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-xs">✕</button>
+                )}
+              </div>
+            )}
+          </div>
           {results.length === 0 && (
             <div className="text-center py-12 text-slate-400">No rooms found matching your criteria.</div>
           )}
           <div className="space-y-3">
-            {results.map((r, i) => (
-              <QuoteCard key={i} result={r} checkin={checkin} checkout={checkout} />
-            ))}
+            {results
+              .filter(r => !resultsSearch.trim() || r.hotel.name.toLowerCase().includes(resultsSearch.toLowerCase()))
+              .map((r, i) => (
+                <QuoteCard key={i} result={r} checkin={checkin} checkout={checkout} />
+              ))}
+            {resultsSearch.trim() && results.filter(r => r.hotel.name.toLowerCase().includes(resultsSearch.toLowerCase())).length === 0 && (
+              <div className="text-center py-8 text-slate-400 text-sm">No hotels match "{resultsSearch}"</div>
+            )}
           </div>
         </div>
       )}
