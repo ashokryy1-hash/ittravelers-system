@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle, Users, List, ChevronRight, Trash2, CalendarClock } from 'lucide-react'
+import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle, Users, List, ChevronRight, Trash2, CalendarClock, Search } from 'lucide-react'
 import type { HmsBooking, HmsBookingEmail, HmsHotel, HmsRoomType } from '../types'
 import EmailPreviewPanel from '../components/EmailPreviewPanel'
 import { Modal } from './RatesScreen'
@@ -192,6 +192,7 @@ export default function ReservationsScreen() {
   const [emailDraft, setEmailDraft] = useState<{ to: string; subject: string; body: string; bookingId: string } | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [statusFilter, setStatusFilter] = useState('All')
+  const [search, setSearch] = useState('')
   const [view, setView] = useState<'list' | 'clients' | 'unpaid'>('list')
   const [openClient, setOpenClient] = useState<string | null>(null)
 
@@ -297,7 +298,18 @@ Agency signature: ${settings.agency_signature}`
     toast.success('Email sent and logged')
   }
 
-  const filtered = (bookings ?? []).filter(b => statusFilter === 'All' || b.status === statusFilter)
+  const searchLower = search.trim().toLowerCase()
+  const filtered = (bookings ?? []).filter(b => {
+    if (statusFilter !== 'All' && b.status !== statusFilter) return false
+    if (!searchLower) return true
+    const hotel = (b as any).hms_hotels
+    return (
+      b.client_name?.toLowerCase().includes(searchLower) ||
+      hotel?.name?.toLowerCase().includes(searchLower) ||
+      hotel?.city?.toLowerCase().includes(searchLower) ||
+      b.hotel_confirmation_number?.toLowerCase().includes(searchLower)
+    )
+  })
 
   const pendingCount = (bookings ?? []).filter(b => b.status === 'Availability pending').length
   const confirmedCount = (bookings ?? []).filter(b => b.status === 'Confirmed').length
@@ -420,6 +432,20 @@ Agency signature: ${settings.agency_signature}`
         <span className="text-sm text-slate-600">{bookings?.length ?? 0} total</span>
         <span className="text-sm text-amber-600">{pendingCount} pending</span>
         <span className="text-sm text-terracotta-600">{confirmedCount} confirmed</span>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by client, hotel, city, or confirmation number…"
+          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 bg-white"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">✕</button>
+        )}
       </div>
 
       {/* Filter */}

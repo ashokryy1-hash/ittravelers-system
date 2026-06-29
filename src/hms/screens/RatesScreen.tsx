@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, X, Building2, FileUp } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, X, Building2, FileUp, Search } from 'lucide-react'
 import type { HmsHotel, HmsDestination, HmsRoomType } from '../types'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -19,6 +19,7 @@ export default function RatesScreen() {
   const [showPdfUpload, setShowPdfUpload] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editHotel, setEditHotel] = useState<HmsHotel | null>(null)
+  const [search, setSearch] = useState('')
 
   const { data: destinations } = useQuery<HmsDestination[]>({
     queryKey: ['hms_destinations'],
@@ -81,17 +82,44 @@ export default function RatesScreen() {
 
       {isLoading && <p className="text-slate-400 text-sm">Loading…</p>}
 
-      <div className="space-y-2">
-        {hotels?.map(hotel => (
-          <HotelRow
-            key={hotel.id}
-            hotel={hotel}
-            expanded={expanded === hotel.id}
-            onToggle={() => setExpanded(expanded === hotel.id ? null : hotel.id)}
-            onEdit={() => { setEditHotel(hotel); setShowForm(true) }}
-            onDelete={() => deleteHotel.mutate(hotel.id)}
+      {/* Search */}
+      {!isLoading && (hotels?.length ?? 0) > 0 && (
+        <div className="relative mb-4">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by hotel name, city, or destination…"
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:border-terracotta-400 focus:ring-1 focus:ring-terracotta-200 bg-white"
           />
-        ))}
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">✕</button>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {(hotels ?? [])
+          .filter(h => {
+            if (!search.trim()) return true
+            const q = search.toLowerCase()
+            return (
+              h.name?.toLowerCase().includes(q) ||
+              h.city?.toLowerCase().includes(q) ||
+              (h as any).hms_destinations?.name?.toLowerCase().includes(q) ||
+              h.chain?.toLowerCase().includes(q)
+            )
+          })
+          .map(hotel => (
+            <HotelRow
+              key={hotel.id}
+              hotel={hotel}
+              expanded={expanded === hotel.id}
+              onToggle={() => setExpanded(expanded === hotel.id ? null : hotel.id)}
+              onEdit={() => { setEditHotel(hotel); setShowForm(true) }}
+              onDelete={() => deleteHotel.mutate(hotel.id)}
+            />
+          ))}
       </div>
 
       {hotels?.length === 0 && !isLoading && (
