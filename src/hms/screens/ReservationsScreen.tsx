@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle, Users, List, ChevronRight, Trash2 } from 'lucide-react'
+import { Plus, Mail, ChevronDown, ChevronUp, AlertTriangle, Users, List, ChevronRight, Trash2, CalendarClock } from 'lucide-react'
 import type { HmsBooking, HmsBookingEmail, HmsHotel, HmsRoomType } from '../types'
 import EmailPreviewPanel from '../components/EmailPreviewPanel'
 import { Modal } from './RatesScreen'
@@ -192,7 +192,7 @@ export default function ReservationsScreen() {
   const [emailDraft, setEmailDraft] = useState<{ to: string; subject: string; body: string; bookingId: string } | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [statusFilter, setStatusFilter] = useState('All')
-  const [view, setView] = useState<'list' | 'clients'>('list')
+  const [view, setView] = useState<'list' | 'clients' | 'unpaid'>('list')
   const [openClient, setOpenClient] = useState<string | null>(null)
 
   const { data: bookings } = useQuery<HmsBooking[]>({
@@ -302,6 +302,49 @@ Agency signature: ${settings.agency_signature}`
   const pendingCount = (bookings ?? []).filter(b => b.status === 'Availability pending').length
   const confirmedCount = (bookings ?? []).filter(b => b.status === 'Confirmed').length
 
+  // Unpaid = Confirmed or Availability pending, not Paid or Cancelled, sorted by cutoff date
+  const unpaidBookings = (bookings ?? [])
+    .filter(b => b.status !== 'Paid' && b.status !== 'Cancelled')
+    .sort((a, b) => {
+      if (!a.cutoff_date && !b.cutoff_date) return 0
+      if (!a.cutoff_date) return 1
+      if (!b.cutoff_date) return -1
+      return a.cutoff_date.localeCompare(b.cutoff_date)
+    })
+
+  function downloadIcs(booking: HmsBooking) {
+    const hotel = (booking as any).hms_hotels
+    const cutoff = booking.cutoff_date
+    if (!cutoff) { toast.error('No payment cutoff date set for this booking'); return }
+    const date = cutoff.replace(/-/g, '')
+    const title = `Pay hotel: ${hotel?.name ?? 'Hotel'} — ${booking.client_name}`
+    const desc = `Booking: ${booking.checkin_date} → ${booking.checkout_date}\\nTotal: ${booking.currency} ${booking.total_price_idr?.toLocaleString()}`
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//ITTravelers//HMS//EN',
+      'BEGIN:VEVENT',
+      `DTSTART;VALUE=DATE:${date}`,
+      `DTEND;VALUE=DATE:${date}`,
+      `SUMMARY:${title}`,
+      `DESCRIPTION:${desc}`,
+      'BEGIN:VALARM',
+      'TRIGGER:-P3D',
+      'ACTION:DISPLAY',
+      `DESCRIPTION:Reminder: ${title}`,
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n')
+    const blob = new Blob([ics], { type: 'text/calendar' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `payment-reminder-${booking.client_name.replace(/\s+/g, '-')}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // Group bookings by client name for the Clients view (normalize: trim + title-case for deduplication)
   const normalizeClientName = (name: string) => name.trim().toLowerCase()
   const clientGroups = filtered.reduce<Record<string, { displayName: string; bookings: HmsBooking[] }>>((acc, b) => {
@@ -349,6 +392,18 @@ Agency signature: ${settings.agency_signature}`
               className={`flex items-center gap-1 px-3 py-1.5 transition-colors ${view === 'clients' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
             >
               <Users size={13} /> Clients
+            </button>
+            <button
+              onClick={() => setView('unpaid')}
+              className={`flex items-center gap-1 px-3 py-1.5 transition-colors ${view === 'unpaid' ? 'bg-orange-600 text-white' : 'text-orange-600 hover:bg-orange-50'}`}
+            >
+              <CalendarClock size={13} />
+              Unpaid
+              {unpaidBookings.length > 0 && (
+                <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${view === 'unpaid' ? 'bg-white text-orange-600' : 'bg-orange-100 text-orange-700'}`}>
+                  {unpaidBookings.length}
+                </span>
+              )}
             </button>
           </div>
           <button
@@ -443,6 +498,52 @@ Agency signature: ${settings.agency_signature}`
                     {clientBookings.map(renderBookingCard)}
                   </div>
                 )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Unpaid view */}
+      {view === 'unpaid' && (
+        <div className="space-y-2">
+          {unpaidBookings.length === 0 && (
+            <div className="text-center py-12 text-slate-400">All bookings are paid. 🎉</div>
+          )}
+          {unpaidBookings.map(booking => {
+            const hotel = (booking as any).hms_hotels
+            const days = daysUntil(booking.cutoff_date)
+            const isOverdue = days !== null && days < 0
+            const isUrgent = days !== null && days >= 0 && days <= 7
+            const isSoon = days !== null && days > 7 && days <= 14
+            return (
+              <div key={booking.id} className={`bg-white border rounded-xl px-4 py-3 flex items-center justify-between gap-3 ${isOverdue ? 'border-red-300 bg-red-50' : isUrgent ? 'border-orange-300' : 'border-slate-200'}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-slate-800">{booking.client_name}</span>
+                    <span className="text-sm text-slate-500">{hotel?.name}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[booking.status] ?? ''}`}>{booking.status}</span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    {booking.checkin_date} → {booking.checkout_date} · {booking.currency} {booking.total_price_idr?.toLocaleString()}
+                  </div>
+                  {booking.cutoff_date && (
+                    <div className={`text-xs font-medium mt-1 flex items-center gap-1 ${isOverdue ? 'text-red-600' : isUrgent ? 'text-orange-600' : isSoon ? 'text-amber-600' : 'text-slate-500'}`}>
+                      <CalendarClock size={11} />
+                      {isOverdue ? `OVERDUE — was due ${booking.cutoff_date}` : `Pay by ${booking.cutoff_date} (${days}d)`}
+                    </div>
+                  )}
+                  {!booking.cutoff_date && (
+                    <div className="text-xs text-slate-300 mt-1 italic">No payment deadline set</div>
+                  )}
+                </div>
+                <button
+                  onClick={() => downloadIcs(booking)}
+                  title="Add payment reminder to calendar"
+                  className="shrink-0 flex items-center gap-1.5 text-xs text-slate-500 hover:text-terracotta-600 border border-slate-200 hover:border-terracotta-400 rounded-lg px-2.5 py-1.5 transition-colors"
+                >
+                  <CalendarClock size={13} /> Add to calendar
+                </button>
               </div>
             )
           })}
@@ -640,7 +741,7 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
                 </button>
               )}
             </div>
-            <Detail label="Total" value={`${booking.currency} ${booking.total_price_idr?.toLocaleString()} ≈ EGP ${booking.total_price_egp?.toLocaleString()}`} />
+            <Detail label="Total" value={`${booking.currency} ${booking.total_price_idr?.toLocaleString()}`} />
             {booking.hotel_confirmation_number && <Detail label="Confirmation #" value={booking.hotel_confirmation_number} />}
             {booking.notes && <Detail label="Notes" value={booking.notes} />}
           </div>
