@@ -488,6 +488,8 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
   const [cutoffDate, setCutoffDate] = useState(booking.cutoff_date ?? '')
   const [editingName, setEditingName] = useState(false)
   const [clientName, setClientName] = useState(booking.client_name ?? '')
+  const [editingPrice, setEditingPrice] = useState(false)
+  const [priceInput, setPriceInput] = useState(String(booking.rate_per_night ?? ''))
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const cutoffDays = daysUntil(booking.cutoff_date)
@@ -519,6 +521,25 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
     qc.invalidateQueries({ queryKey: ['hms_bookings'] })
     setEditingName(false)
     toast.success('Client name updated')
+  }
+
+  async function savePrice() {
+    const rate = parseFloat(priceInput)
+    if (isNaN(rate) || rate <= 0) { toast.error('Enter a valid rate'); return }
+    const totalIdr = rate * booking.nights
+    const settings = await getSettings()
+    const idrToEgp = parseFloat(settings.IDR_to_EGP) || 0
+    const totalEgp = booking.currency === 'IDR' ? Math.round(totalIdr * idrToEgp)
+      : booking.currency === 'THB' ? Math.round(totalIdr * (parseFloat(settings.THB_to_EGP) || 0))
+      : Math.round(totalIdr * (parseFloat(settings.USD_to_EGP) || 0))
+    await supabase.from('hms_bookings').update({
+      rate_per_night: rate,
+      total_price_idr: totalIdr,
+      total_price_egp: totalEgp,
+    }).eq('id', booking.id)
+    qc.invalidateQueries({ queryKey: ['hms_bookings'] })
+    setEditingPrice(false)
+    toast.success('Price updated')
   }
 
   async function logIncoming() {
@@ -592,7 +613,33 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
 
           <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
             <Detail label="Room" value={`${room?.name} (${room?.meal_plan})`} />
-            <Detail label="Rate/night" value={`${booking.currency} ${booking.rate_per_night?.toLocaleString()}`} />
+            {/* Editable rate/night */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 shrink-0">Rate/night</span>
+              {editingPrice ? (
+                <>
+                  <span className="text-slate-500 text-xs">{booking.currency}</span>
+                  <input
+                    autoFocus
+                    type="number"
+                    className="border border-terracotta-400 rounded-lg px-2 py-0.5 w-28 text-sm focus:outline-none focus:ring-1 focus:ring-terracotta-400"
+                    value={priceInput}
+                    onChange={e => setPriceInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') savePrice(); if (e.key === 'Escape') { setEditingPrice(false); setPriceInput(String(booking.rate_per_night ?? '')) } }}
+                  />
+                  <button onClick={savePrice} className="text-xs bg-terracotta-600 text-white rounded-lg px-2 py-0.5 hover:bg-terracotta-700">Save</button>
+                  <button onClick={() => { setEditingPrice(false); setPriceInput(String(booking.rate_per_night ?? '')) }} className="text-xs border border-slate-300 rounded-lg px-2 py-0.5 hover:bg-slate-50">✕</button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setEditingPrice(true)}
+                  className="text-slate-700 hover:text-terracotta-600 flex items-center gap-1 group"
+                >
+                  {booking.currency} {booking.rate_per_night?.toLocaleString()}
+                  <span className="text-xs text-slate-400 group-hover:text-terracotta-500 opacity-0 group-hover:opacity-100 transition-opacity">(edit)</span>
+                </button>
+              )}
+            </div>
             <Detail label="Total" value={`${booking.currency} ${booking.total_price_idr?.toLocaleString()} ≈ EGP ${booking.total_price_egp?.toLocaleString()}`} />
             {booking.hotel_confirmation_number && <Detail label="Confirmation #" value={booking.hotel_confirmation_number} />}
             {booking.notes && <Detail label="Notes" value={booking.notes} />}
