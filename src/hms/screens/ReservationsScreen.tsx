@@ -633,10 +633,10 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
               ) : (
                 <button
                   onClick={() => setEditingPrice(true)}
-                  className="text-slate-700 hover:text-terracotta-600 flex items-center gap-1 group"
+                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-dashed border-slate-300 hover:border-terracotta-400 hover:bg-terracotta-50 text-slate-700 hover:text-terracotta-700 transition-colors"
                 >
                   {booking.currency} {booking.rate_per_night?.toLocaleString()}
-                  <span className="text-xs text-slate-400 group-hover:text-terracotta-500 opacity-0 group-hover:opacity-100 transition-opacity">(edit)</span>
+                  <span className="text-xs text-slate-400">✏️</span>
                 </button>
               )}
             </div>
