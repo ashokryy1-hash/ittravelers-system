@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { ArrowLeft, Search, ChevronDown, ChevronUp, Trash2, Calendar, Building2 } from 'lucide-react'
+import { ArrowLeft, Search, ChevronDown, ChevronUp, Trash2, Calendar, Building2, Calculator } from 'lucide-react'
 import { useBasePath } from '../context/TripExplorerContext'
 import { format, parseISO } from 'date-fns'
 import type { SessionSelection } from '../types'
@@ -193,6 +193,28 @@ export default function SessionsScreen() {
                     <div>
                       <p className="font-body text-xs uppercase tracking-wider text-gray-400 mb-1">Notes</p>
                       <p className="font-body text-sm text-gray-600 whitespace-pre-wrap">{session.notes}</p>
+                    </div>
+                  )}
+
+                  {hotels.length > 0 && (
+                    <div className="pt-2 border-t border-ivory-200">
+                      <button
+                        onClick={() => {
+                          const quoteData = hotels.map(h => ({
+                            name: h.name,
+                            cityName: h.cityName,
+                            checkIn: session.hotel_dates[h.id]?.checkIn ?? '',
+                            checkOut: session.hotel_dates[h.id]?.checkOut ?? '',
+                            roomType: session.hotel_dates[h.id]?.roomType ?? '',
+                          }))
+                          localStorage.setItem('trip_explorer_quote', JSON.stringify(quoteData))
+                          navigate('/hms/rates/quote')
+                        }}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-body text-sm font-medium transition-colors shadow"
+                      >
+                        <Calculator size={15} />
+                        Get Quote
+                      </button>
                     </div>
                   )}
                 </div>
