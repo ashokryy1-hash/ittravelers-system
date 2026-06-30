@@ -34,6 +34,8 @@ interface TourDay {
   sort_order: number
   status: string
   booking_link: string | null
+  quoted_price: number | null
+  paid_price: number | null
   hms_tour_activities: TourActivity[]
 }
 
@@ -394,8 +396,18 @@ function TourCard({ tour }: { tour: Tour }) {
                   <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${day.status === 'Confirmed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                     {day.status ?? 'Pending'}
                   </span>
+                  {day.quoted_price != null && (
+                    <span className="text-xs text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">
+                      Quoted: <span className="font-medium text-slate-700">{Number(day.quoted_price).toLocaleString()}</span>
+                    </span>
+                  )}
+                  {day.paid_price != null && (
+                    <span className={`text-xs rounded px-1.5 py-0.5 ${day.paid_price > (day.quoted_price ?? 0) ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
+                      Paid: <span className="font-medium">{Number(day.paid_price).toLocaleString()}</span>
+                    </span>
+                  )}
                   {day.booking_link && (
-                    <a href={day.booking_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
+                    <a href={day.booking_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
                       🔗 Link
                     </a>
                   )}
@@ -989,6 +1001,8 @@ interface DayDraft {
   date: string
   status: string
   booking_link: string
+  quoted_price: string
+  paid_price: string
   activities: ActivityItem[]
 }
 
@@ -1105,13 +1119,35 @@ function DayBuilder({ day, dayIdx, totalDays, templates, hotelOptions, confirmed
             </button>
           )}
         </div>
-        {/* Booking link for this day */}
-        <input
-          value={day.booking_link}
-          onChange={e => onChange({ ...day, booking_link: e.target.value })}
-          placeholder="🔗 Booking / supplier link for this day (optional)"
-          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-slate-600 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-terracotta-400 bg-white"
-        />
+        {/* Prices + link */}
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">Quoted</span>
+            <input
+              type="number"
+              value={day.quoted_price}
+              onChange={e => onChange({ ...day, quoted_price: e.target.value })}
+              placeholder="0"
+              className="w-24 text-xs text-slate-700 focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">Paid</span>
+            <input
+              type="number"
+              value={day.paid_price}
+              onChange={e => onChange({ ...day, paid_price: e.target.value })}
+              placeholder="0"
+              className="w-24 text-xs text-slate-700 focus:outline-none"
+            />
+          </div>
+          <input
+            value={day.booking_link}
+            onChange={e => onChange({ ...day, booking_link: e.target.value })}
+            placeholder="🔗 Supplier / booking link (optional)"
+            className="flex-1 min-w-[180px] text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-slate-600 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-terracotta-400 bg-white"
+          />
+        </div>
       </div>
 
       <div className="p-4 space-y-4">
@@ -1290,6 +1326,8 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
       date: day.date ?? '',
       status: day.status ?? 'Pending',
       booking_link: day.booking_link ?? '',
+      quoted_price: day.quoted_price?.toString() ?? '',
+      paid_price: day.paid_price?.toString() ?? '',
       activities: [...(day.hms_tour_activities ?? [])]
         .sort((a, b) => a.sort_order - b.sort_order)
         .map(act => {
@@ -1339,7 +1377,7 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
   const hotelOptions = [...confirmedHotels, ...allHotelNames.filter(n => !confirmedHotels.some(c => n.startsWith(c)))]
 
   function addDay() {
-    setDays(d => [...d, { date: '', status: 'Pending', booking_link: '', activities: [{ time: '', description: '', type: 'stop' }] }])
+    setDays(d => [...d, { date: '', status: 'Pending', booking_link: '', quoted_price: '', paid_price: '', activities: [{ time: '', description: '', type: 'stop' }] }])
   }
 
   function removeDay(i: number) {
@@ -1367,7 +1405,7 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
         const day = days[i]
         const { data: dayRow, error: dErr } = await supabase
           .from('hms_tour_days')
-          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i, status: day.status, booking_link: day.booking_link || null })
+          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i, status: day.status, booking_link: day.booking_link || null, quoted_price: day.quoted_price ? parseFloat(day.quoted_price) : null, paid_price: day.paid_price ? parseFloat(day.paid_price) : null })
           .select().single()
         if (dErr) throw dErr
 
@@ -1513,7 +1551,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
   const [tourStatus, setTourStatus] = useState('Pending')
   const [tourLink, setTourLink] = useState('')
   const [notes, setNotes] = useState('')
-  const [days, setDays] = useState<DayDraft[]>([{ date: '', status: 'Pending', booking_link: '', activities: [{ time: '', description: '', type: 'stop' }] }])
+  const [days, setDays] = useState<DayDraft[]>([{ date: '', status: 'Pending', booking_link: '', quoted_price: '', paid_price: '', activities: [{ time: '', description: '', type: 'stop' }] }])
   const [saving, setSaving] = useState(false)
 
   const { data: templates = [] } = useQuery<ActivityTemplate[]>({
@@ -1584,7 +1622,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
   }
 
   function addDay() {
-    setDays(d => [...d, { date: '', status: 'Pending', booking_link: '', activities: [{ time: '', description: '', type: 'stop' }] }])
+    setDays(d => [...d, { date: '', status: 'Pending', booking_link: '', quoted_price: '', paid_price: '', activities: [{ time: '', description: '', type: 'stop' }] }])
   }
 
   function removeDay(i: number) {
@@ -1610,7 +1648,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
         const day = days[i]
         const { data: dayRow, error: dErr } = await supabase
           .from('hms_tour_days')
-          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i, status: day.status, booking_link: day.booking_link || null })
+          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i, status: day.status, booking_link: day.booking_link || null, quoted_price: day.quoted_price ? parseFloat(day.quoted_price) : null, paid_price: day.paid_price ? parseFloat(day.paid_price) : null })
           .select()
           .single()
         if (dErr) throw dErr
