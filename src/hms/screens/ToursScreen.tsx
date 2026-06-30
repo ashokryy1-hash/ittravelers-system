@@ -32,6 +32,8 @@ interface TourDay {
   tour_id: string
   date: string | null
   sort_order: number
+  status: string
+  booking_link: string | null
   hms_tour_activities: TourActivity[]
 }
 
@@ -40,6 +42,8 @@ interface Tour {
   client_name: string
   pax: number
   notes: string | null
+  status: string
+  booking_link: string | null
   created_at: string
   hms_tour_days: TourDay[]
 }
@@ -341,12 +345,17 @@ function TourCard({ tour }: { tour: Tour }) {
     {editing && <EditTourModal tour={tour} onClose={() => setEditing(false)} />}
     <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3">
-        <button onClick={() => setExpanded(e => !e)} className="flex-1 text-left flex items-center gap-3">
-          <div>
-            <div className="font-semibold text-slate-800">{tour.client_name}</div>
+        <button onClick={() => setExpanded(e => !e)} className="flex-1 text-left flex items-center gap-3 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-slate-800">{tour.client_name}</span>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${tour.status === 'Confirmed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                {tour.status ?? 'Pending'}
+              </span>
+            </div>
             <div className="text-xs text-slate-500">{tour.pax} pax · {days.length} day{days.length !== 1 ? 's' : ''}</div>
           </div>
-          {expanded ? <ChevronUp size={16} className="ml-auto text-slate-400" /> : <ChevronDown size={16} className="ml-auto text-slate-400" />}
+          {expanded ? <ChevronUp size={16} className="ml-auto shrink-0 text-slate-400" /> : <ChevronDown size={16} className="ml-auto shrink-0 text-slate-400" />}
         </button>
         <button
           onClick={copyWhatsApp}
@@ -380,8 +389,16 @@ function TourCard({ tour }: { tour: Tour }) {
             const acts = [...(day.hms_tour_activities ?? [])].sort((a, b) => a.sort_order - b.sort_order)
             return (
               <div key={day.id}>
-                <div className="text-xs font-bold text-terracotta-700 uppercase tracking-wide mb-1">
-                  🌴 {formatDay(day.date, i + 1)}
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-xs font-bold text-terracotta-700 uppercase tracking-wide">🌴 {formatDay(day.date, i + 1)}</span>
+                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${day.status === 'Confirmed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {day.status ?? 'Pending'}
+                  </span>
+                  {day.booking_link && (
+                    <a href={day.booking_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
+                      🔗 Link
+                    </a>
+                  )}
                 </div>
                 <div className="space-y-0.5 pl-2">
                   {/* Tour stops — bullets, no time */}
@@ -970,6 +987,8 @@ function DayLibraryPicker({
 
 interface DayDraft {
   date: string
+  status: string
+  booking_link: string
   activities: ActivityItem[]
 }
 
@@ -1061,21 +1080,38 @@ function DayBuilder({ day, dayIdx, totalDays, templates, hotelOptions, confirmed
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden">
       {/* Day header */}
-      <div className="flex items-center justify-between bg-terracotta-50 px-4 py-2.5 border-b border-terracotta-100">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-bold text-terracotta-700">🌴 Day {dayIdx + 1}</span>
-          <input
-            type="date"
-            value={day.date}
-            onChange={e => onChange({ ...day, date: e.target.value })}
-            className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-terracotta-400"
-          />
+      <div className="bg-terracotta-50 px-4 py-2.5 border-b border-terracotta-100 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-bold text-terracotta-700">🌴 Day {dayIdx + 1}</span>
+            <input
+              type="date"
+              value={day.date}
+              onChange={e => onChange({ ...day, date: e.target.value })}
+              className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-terracotta-400"
+            />
+            <select
+              value={day.status}
+              onChange={e => onChange({ ...day, status: e.target.value })}
+              className={`text-xs font-medium rounded-full px-3 py-1 border focus:outline-none focus:ring-2 focus:ring-terracotta-400 ${day.status === 'Confirmed' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-amber-100 border-amber-300 text-amber-700'}`}
+            >
+              <option value="Pending">Pending</option>
+              <option value="Confirmed">Confirmed</option>
+            </select>
+          </div>
+          {totalDays > 1 && (
+            <button onClick={onRemove} className="text-slate-400 hover:text-red-500 shrink-0">
+              <Trash2 size={14} />
+            </button>
+          )}
         </div>
-        {totalDays > 1 && (
-          <button onClick={onRemove} className="text-slate-400 hover:text-red-500">
-            <Trash2 size={14} />
-          </button>
-        )}
+        {/* Booking link for this day */}
+        <input
+          value={day.booking_link}
+          onChange={e => onChange({ ...day, booking_link: e.target.value })}
+          placeholder="🔗 Booking / supplier link for this day (optional)"
+          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-slate-600 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-terracotta-400 bg-white"
+        />
       </div>
 
       <div className="p-4 space-y-4">
@@ -1244,12 +1280,16 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
 
   const [clientName, setClientName] = useState(tour.client_name)
   const [pax, setPax] = useState(tour.pax)
+  const [tourStatus, setTourStatus] = useState(tour.status ?? 'Pending')
+  const [tourLink, setTourLink] = useState(tour.booking_link ?? '')
   const [contactName, setContactName] = useState(initCN)
   const [contactPhone, setContactPhone] = useState(initCP)
   const [notes, setNotes] = useState(initNotes)
   const [days, setDays] = useState<DayDraft[]>(() =>
     sortedDays.map(day => ({
       date: day.date ?? '',
+      status: day.status ?? 'Pending',
+      booking_link: day.booking_link ?? '',
       activities: [...(day.hms_tour_activities ?? [])]
         .sort((a, b) => a.sort_order - b.sort_order)
         .map(act => {
@@ -1299,7 +1339,7 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
   const hotelOptions = [...confirmedHotels, ...allHotelNames.filter(n => !confirmedHotels.some(c => n.startsWith(c)))]
 
   function addDay() {
-    setDays(d => [...d, { date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
+    setDays(d => [...d, { date: '', status: 'Pending', booking_link: '', activities: [{ time: '', description: '', type: 'stop' }] }])
   }
 
   function removeDay(i: number) {
@@ -1316,7 +1356,7 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
 
       const { error: tErr } = await supabase
         .from('hms_tours')
-        .update({ client_name: clientName.trim(), pax, notes: fullNotes || null })
+        .update({ client_name: clientName.trim(), pax, notes: fullNotes || null, status: tourStatus, booking_link: tourLink.trim() || null })
         .eq('id', tour.id)
       if (tErr) throw tErr
 
@@ -1327,7 +1367,7 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
         const day = days[i]
         const { data: dayRow, error: dErr } = await supabase
           .from('hms_tour_days')
-          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i })
+          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i, status: day.status, booking_link: day.booking_link || null })
           .select().single()
         if (dErr) throw dErr
 
@@ -1380,6 +1420,21 @@ function EditTourModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Pax</label>
               <input type="number" min={1} value={pax} onChange={e => setPax(Number(e.target.value))} className={inp} />
+            </div>
+          </div>
+
+          {/* Tour Status + Booking Link */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Tour Status</label>
+              <select value={tourStatus} onChange={e => setTourStatus(e.target.value)} className={inp}>
+                <option value="Pending">Pending</option>
+                <option value="Confirmed">Confirmed</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Booking / Supplier Link</label>
+              <input value={tourLink} onChange={e => setTourLink(e.target.value)} className={inp} placeholder="https://…" />
             </div>
           </div>
 
@@ -1455,8 +1510,10 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [pax, setPax] = useState(2)
+  const [tourStatus, setTourStatus] = useState('Pending')
+  const [tourLink, setTourLink] = useState('')
   const [notes, setNotes] = useState('')
-  const [days, setDays] = useState<DayDraft[]>([{ date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
+  const [days, setDays] = useState<DayDraft[]>([{ date: '', status: 'Pending', booking_link: '', activities: [{ time: '', description: '', type: 'stop' }] }])
   const [saving, setSaving] = useState(false)
 
   const { data: templates = [] } = useQuery<ActivityTemplate[]>({
@@ -1527,7 +1584,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
   }
 
   function addDay() {
-    setDays(d => [...d, { date: '', activities: [{ time: '', description: '', type: 'stop' }] }])
+    setDays(d => [...d, { date: '', status: 'Pending', booking_link: '', activities: [{ time: '', description: '', type: 'stop' }] }])
   }
 
   function removeDay(i: number) {
@@ -1544,7 +1601,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
       const fullNotes = contactLine + (notes.trim() || '')
       const { data: tour, error: tErr } = await supabase
         .from('hms_tours')
-        .insert({ client_name: clientName.trim(), pax, notes: fullNotes || null })
+        .insert({ client_name: clientName.trim(), pax, notes: fullNotes || null, status: tourStatus, booking_link: tourLink.trim() || null })
         .select()
         .single()
       if (tErr) throw tErr
@@ -1553,7 +1610,7 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
         const day = days[i]
         const { data: dayRow, error: dErr } = await supabase
           .from('hms_tour_days')
-          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i })
+          .insert({ tour_id: tour.id, date: day.date || null, sort_order: i, status: day.status, booking_link: day.booking_link || null })
           .select()
           .single()
         if (dErr) throw dErr
@@ -1704,6 +1761,21 @@ function NewTourModal({ onClose }: { onClose: () => void }) {
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Contact phone</label>
                   <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} className={inp} placeholder="+20 100…" />
+                </div>
+              </div>
+
+              {/* Tour Status + Link */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Tour Status</label>
+                  <select value={tourStatus} onChange={e => setTourStatus(e.target.value)} className={inp}>
+                    <option value="Pending">Pending</option>
+                    <option value="Confirmed">Confirmed</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Booking / Supplier Link</label>
+                  <input value={tourLink} onChange={e => setTourLink(e.target.value)} className={inp} placeholder="https://…" />
                 </div>
               </div>
 
