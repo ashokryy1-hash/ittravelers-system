@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { Plus, ChevronDown, ChevronRight, Edit2, Trash2, X, Building2, FileUp, Search } from 'lucide-react'
-import type { HmsHotel, HmsDestination, HmsRoomType } from '../types'
+import type { HmsHotel, HmsDestination, HmsRoomType, HmsSurchargeRule } from '../types'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import PdfContractUpload from '../components/PdfContractUpload'
@@ -144,6 +144,9 @@ export default function RatesScreen() {
           onSaved={() => { setShowPdfUpload(false); qc.invalidateQueries({ queryKey: ['hms_hotels'] }) }}
         />
       )}
+
+      {/* Surcharge Rules */}
+      <SurchargeRulesSection destinations={destinations ?? []} />
     </div>
   )
 }
@@ -547,5 +550,176 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       {children}
     </div>
+  )
+}
+
+// ---- Surcharge Rules Section ----
+function SurchargeRulesSection({ destinations }: { destinations: HmsDestination[] }) {
+  const qc = useQueryClient()
+  const [showForm, setShowForm] = useState(false)
+  const [editRule, setEditRule] = useState<HmsSurchargeRule | null>(null)
+
+  const { data: rules } = useQuery<HmsSurchargeRule[]>({
+    queryKey: ['hms_surcharge_rules_manage'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('hms_surcharge_rules')
+        .select('*, hms_destinations(name)')
+        .order('start_date')
+      return data ?? []
+    },
+  })
+
+  const deleteRule = useMutation({
+    mutationFn: async (id: string) => { await supabase.from('hms_surcharge_rules').delete().eq('id', id) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['hms_surcharge_rules_manage'] }); toast.success('Rule deleted') },
+  })
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">Season Surcharge Rules</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Extra amount added per night during high/peak seasons. Set once per destination — applies to all hotels automatically.</p>
+        </div>
+        <button
+          onClick={() => { setEditRule(null); setShowForm(true) }}
+          className="flex items-center gap-1 text-sm border border-slate-300 rounded-lg px-4 py-2 hover:bg-slate-50"
+        >
+          <Plus size={15} /> Add Rule
+        </button>
+      </div>
+
+      {rules?.length === 0 && (
+        <div className="text-center py-10 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+          <p className="text-sm">No surcharge rules yet.</p>
+          <p className="text-xs mt-1">Add high and peak season surcharge amounts for each destination.</p>
+        </div>
+      )}
+
+      {(rules?.length ?? 0) > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Destination</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Season</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Period</th>
+                <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Room surcharge</th>
+                <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Villa surcharge</th>
+                <th className="px-2 py-2.5" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rules?.map(rule => (
+                <tr key={rule.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-2.5 text-slate-700">{(rule as any).hms_destinations?.name ?? '—'}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${rule.season_name.toLowerCase().includes('peak') ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {rule.season_name}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-500 text-xs">{rule.start_date} → {rule.end_date}</td>
+                  <td className="px-4 py-2.5 text-right text-slate-700">IDR {rule.room_surcharge?.toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right text-slate-700">IDR {rule.villa_surcharge?.toLocaleString()}</td>
+                  <td className="px-2 py-2.5">
+                    <div className="flex gap-1 justify-end">
+                      <button onClick={() => { setEditRule(rule); setShowForm(true) }} className="text-slate-400 hover:text-slate-600 p-1"><Edit2 size={13} /></button>
+                      <button onClick={() => { if (confirm('Delete this surcharge rule?')) deleteRule.mutate(rule.id) }} className="text-slate-400 hover:text-red-500 p-1"><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showForm && (
+        <SurchargeRuleForm
+          destinations={destinations}
+          rule={editRule}
+          onClose={() => setShowForm(false)}
+          onSaved={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['hms_surcharge_rules_manage'] }); qc.invalidateQueries({ queryKey: ['hms_surcharge_rules'] }) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function SurchargeRuleForm({ destinations, rule, onClose, onSaved }: {
+  destinations: HmsDestination[]
+  rule: HmsSurchargeRule | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [form, setForm] = useState({
+    destination_id: rule?.destination_id ?? '',
+    season_name: rule?.season_name ?? '',
+    start_date: rule?.start_date ?? '',
+    end_date: rule?.end_date ?? '',
+    room_surcharge: rule?.room_surcharge?.toString() ?? '',
+    villa_surcharge: rule?.villa_surcharge?.toString() ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }))
+
+  async function save() {
+    if (!form.destination_id || !form.season_name || !form.start_date || !form.end_date) {
+      toast.error('Fill in all required fields'); return
+    }
+    setSaving(true)
+    const payload = {
+      destination_id: form.destination_id,
+      season_name: form.season_name,
+      start_date: form.start_date,
+      end_date: form.end_date,
+      room_surcharge: parseFloat(form.room_surcharge) || 0,
+      villa_surcharge: parseFloat(form.villa_surcharge) || 0,
+    }
+    if (rule) {
+      await supabase.from('hms_surcharge_rules').update(payload).eq('id', rule.id)
+    } else {
+      await supabase.from('hms_surcharge_rules').insert(payload)
+    }
+    setSaving(false)
+    toast.success(rule ? 'Rule updated' : 'Rule added')
+    onSaved()
+  }
+
+  return (
+    <Modal title={rule ? 'Edit Surcharge Rule' : 'Add Surcharge Rule'} onClose={onClose}>
+      <div className="space-y-3">
+        <Row label="Destination *">
+          <select className={inp} value={form.destination_id} onChange={set('destination_id')}>
+            <option value="">Select destination…</option>
+            {destinations.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </Row>
+        <Row label="Season name *">
+          <input className={inp} value={form.season_name} onChange={set('season_name')} placeholder="e.g. High Season 2026 or Peak Season 2026" />
+        </Row>
+        <p className="text-xs text-slate-400 -mt-1">Include the word "peak" in the name for peak season (e.g. "Peak Season 2026")</p>
+        <Row label="Start date *">
+          <input type="date" className={inp} value={form.start_date} onChange={set('start_date')} />
+        </Row>
+        <Row label="End date *">
+          <input type="date" className={inp} value={form.end_date} onChange={set('end_date')} />
+        </Row>
+        <Row label="Room surcharge (IDR/night)">
+          <input type="number" className={inp} value={form.room_surcharge} onChange={set('room_surcharge')} placeholder="e.g. 450000" />
+        </Row>
+        <Row label="Villa surcharge (IDR/night)">
+          <input type="number" className={inp} value={form.villa_surcharge} onChange={set('villa_surcharge')} placeholder="e.g. 700000" />
+        </Row>
+      </div>
+      <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-gray-200">
+        <button onClick={onClose} className="text-sm border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50">Cancel</button>
+        <button onClick={save} disabled={saving} className="text-sm bg-terracotta-600 text-white rounded-lg px-5 py-2 hover:bg-terracotta-700 disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </Modal>
   )
 }
