@@ -108,6 +108,8 @@ export interface HmsBooking {
   hotel_confirmation_number: string | null
   cutoff_date: string | null
   notes: string | null
+  quoted_price: number | null
+  paid_price: number | null
   created_at: string
   hms_hotels?: HmsHotel
   hms_room_types?: HmsRoomType

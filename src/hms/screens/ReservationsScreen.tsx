@@ -617,6 +617,8 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
   const [clientName, setClientName] = useState(booking.client_name ?? '')
   const [editingPrice, setEditingPrice] = useState(false)
   const [priceInput, setPriceInput] = useState(String(booking.rate_per_night ?? ''))
+  const [quotedPrice, setQuotedPrice] = useState(String(booking.quoted_price ?? ''))
+  const [paidPrice, setPaidPrice] = useState(String(booking.paid_price ?? ''))
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const cutoffDays = daysUntil(booking.cutoff_date)
@@ -667,6 +669,15 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
     qc.invalidateQueries({ queryKey: ['hms_bookings'] })
     setEditingPrice(false)
     toast.success('Price updated')
+  }
+
+  async function saveQuotedPaid() {
+    await supabase.from('hms_bookings').update({
+      quoted_price: quotedPrice ? parseFloat(quotedPrice) : null,
+      paid_price: paidPrice ? parseFloat(paidPrice) : null,
+    }).eq('id', booking.id)
+    qc.invalidateQueries({ queryKey: ['hms_bookings'] })
+    toast.success('Prices saved')
   }
 
   async function logIncoming() {
@@ -770,6 +781,39 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
             <Detail label="Total" value={`${booking.currency} ${booking.total_price_idr?.toLocaleString()}`} />
             {booking.hotel_confirmation_number && <Detail label="Confirmation #" value={booking.hotel_confirmation_number} />}
             {booking.notes && <Detail label="Notes" value={booking.notes} />}
+          </div>
+
+          {/* Quoted vs Paid */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide shrink-0">Quoted</span>
+              <input
+                type="number"
+                value={quotedPrice}
+                onChange={e => setQuotedPrice(e.target.value)}
+                onBlur={saveQuotedPaid}
+                placeholder="0"
+                className="w-28 text-sm text-slate-700 bg-transparent focus:outline-none"
+              />
+            </div>
+            <div className={`flex items-center gap-1.5 border rounded-lg px-3 py-1.5 ${paidPrice && quotedPrice && parseFloat(paidPrice) > parseFloat(quotedPrice) ? 'border-red-200 bg-red-50' : paidPrice ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-slate-50'}`}>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide shrink-0">Paid</span>
+              <input
+                type="number"
+                value={paidPrice}
+                onChange={e => setPaidPrice(e.target.value)}
+                onBlur={saveQuotedPaid}
+                placeholder="0"
+                className="w-28 text-sm text-slate-700 bg-transparent focus:outline-none"
+              />
+            </div>
+            {quotedPrice && paidPrice && (
+              <span className={`text-xs font-medium px-2 py-1 rounded-lg ${parseFloat(paidPrice) > parseFloat(quotedPrice) ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                {parseFloat(paidPrice) > parseFloat(quotedPrice)
+                  ? `Over by ${(parseFloat(paidPrice) - parseFloat(quotedPrice)).toLocaleString()}`
+                  : `Saved ${(parseFloat(quotedPrice) - parseFloat(paidPrice)).toLocaleString()}`}
+              </span>
+            )}
           </div>
 
           {/* Status update */}
