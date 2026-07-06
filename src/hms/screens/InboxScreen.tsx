@@ -470,8 +470,8 @@ export default function InboxScreen() {
         if (bookErr) throw new Error('Bookings failed: ' + bookErr.message)
       }
 
-      // 2. Create tour file if there are tours
-      if (parsed.tours.length > 0) {
+      // 2. Create tour file if there are tours OR transfers
+      if (parsed.tours.length > 0 || parsed.transfers.length > 0) {
         const { data: tour, error: tourErr } = await supabase
           .from('hms_tours')
           .insert({
@@ -485,34 +485,65 @@ export default function InboxScreen() {
           .single()
         if (tourErr) throw new Error('Tour failed: ' + tourErr.message)
 
-        // Insert one day per tour item, then one activity per day with the tour title
-        for (let i = 0; i < parsed.tours.length; i++) {
-          const t = parsed.tours[i]
+        // Build a combined day list: tours + transfers, sorted by date
+        type DayEntry =
+          | { kind: 'tour'; date: string | null; t: ParsedTour }
+          | { kind: 'transfer'; date: string | null; x: ParsedTransfer }
+
+        const allDays: DayEntry[] = [
+          ...parsed.tours.map(t => ({ kind: 'tour' as const, date: t.date, t })),
+          ...parsed.transfers.map(x => ({ kind: 'transfer' as const, date: x.date, x })),
+        ].sort((a, b) => {
+          if (!a.date && !b.date) return 0
+          if (!a.date) return 1
+          if (!b.date) return -1
+          return a.date.localeCompare(b.date)
+        })
+
+        for (let i = 0; i < allDays.length; i++) {
+          const entry = allDays[i]
+          const isTour = entry.kind === 'tour'
+          const t = isTour ? entry.t : null
+          const x = !isTour ? entry.x : null
+
           const { data: day, error: dayErr } = await supabase
             .from('hms_tour_days')
             .insert({
               tour_id: tour.id,
-              date: t.date ?? null,
-              sort_order: i + 1,
+              date: entry.date ?? null,
+              sort_order: i,
               status: 'Pending',
-              booking_link: t.booking_link ?? null,
-              quoted_price: t.price ?? null,
+              booking_link: t?.booking_link ?? null,
+              quoted_price: (t?.price ?? x?.price) ?? null,
               paid_price: null,
             })
             .select()
             .single()
-          if (dayErr) throw new Error(`Tour day ${i + 1} failed: ` + dayErr.message)
+          if (dayErr) throw new Error(`Day ${i + 1} failed: ` + dayErr.message)
 
-          // Store title as the activity description
-          const { error: actErr } = await supabase
-            .from('hms_tour_activities')
-            .insert({
-              day_id: day.id,
-              description: t.title,
-              time: '',
-              sort_order: 1,
-            })
-          if (actErr) throw new Error(`Tour activity ${i + 1} failed: ` + actErr.message)
+          let description: string
+          let time = ''
+
+          if (isTour && t) {
+            // Regular tour activity — plain text shows as bullet point
+            description = t.title
+          } else if (x) {
+            // Transfer — parse "From → To" or "From to To" from route string
+            const arrowMatch = x.route.match(/^(.+?)\s*[→\-–>]+\s*(.+)$/)
+            const from = arrowMatch ? arrowMatch[1].trim() : x.route
+            const to = arrowMatch ? arrowMatch[2].trim() : ''
+            // Use transfer activity format that ToursScreen recognises
+            description = `__transfer__:${from}|||${to}|||`
+          } else {
+            description = ''
+          }
+
+          if (description) {
+            const { error: actErr } = await supabase
+              .from('hms_tour_activities')
+              .insert({ day_id: day.id, description, time, sort_order: 1 })
+            if (actErr) throw new Error(`Activity ${i + 1} failed: ` + actErr.message)
+          }
         }
       }
 
@@ -526,6 +557,7 @@ export default function InboxScreen() {
       const parts = []
       if (parsed.hotels.length > 0) parts.push(`${parsed.hotels.length} booking${parsed.hotels.length > 1 ? 's' : ''}`)
       if (parsed.tours.length > 0) parts.push(`${parsed.tours.length} tour day${parsed.tours.length > 1 ? 's' : ''}`)
+      if (parsed.transfers.length > 0) parts.push(`${parsed.transfers.length} transfer${parsed.transfers.length > 1 ? 's' : ''}`)
       toast.success(`Saved: ${parts.join(' + ')}`)
       setView('list')
     } catch (err: any) {
@@ -732,7 +764,7 @@ export default function InboxScreen() {
           >
             {saving
               ? <><Loader2 size={15} className="animate-spin" /> Saving…</>
-              : <><Save size={15} /> Save {totalBookings > 0 ? `${totalBookings} booking${totalBookings > 1 ? 's' : ''}` : ''}{totalBookings > 0 && totalTours > 0 ? ' + ' : ''}{totalTours > 0 ? `${totalTours} tour days` : ''} to HMS</>
+              : <><Save size={15} /> Save {totalBookings > 0 ? `${totalBookings} booking${totalBookings > 1 ? 's' : ''}` : ''}{totalBookings > 0 && (totalTours > 0 || parsed.transfers.length > 0) ? ' + ' : ''}{totalTours > 0 ? `${totalTours} tour days` : ''}{totalTours > 0 && parsed.transfers.length > 0 ? ' + ' : ''}{parsed.transfers.length > 0 ? `${parsed.transfers.length} transfers` : ''} to HMS</>
             }
           </button>
           <button onClick={ignoreEmail} className="border border-ivory-300 text-ivory-600 text-sm px-5 py-3 rounded-xl hover:bg-ivory-100 transition-colors">
