@@ -129,9 +129,10 @@ function parseBookingEmail(body: string): ParsedEmail {
 
   // Find section boundaries
   const hotelSectionIdx = nonEmpty.findIndex(l => /🏨|^hotels:/i.test(l))
-  const tourSectionIdx = nonEmpty.findIndex(l => /^tours:/i.test(l.replace(/[^a-zA-Z:]/g, '')))
-  const flightSectionIdx = nonEmpty.findIndex(l => /✈️|flight details/i.test(l))
-  const transferIdx = nonEmpty.findIndex(l => /transfer/i.test(l))
+  // Handles: "Tours:", "Tours (GetYourGuide):", "Tours (Direct):" etc.
+  const tourSectionIdx = nonEmpty.findIndex(l => /^tours[\s(:]/i.test(l) || /^tours$/i.test(l))
+  const flightSectionIdx = nonEmpty.findIndex(l => /✈️|flight\s*(details|price)/i.test(l))
+  const transferIdx = nonEmpty.findIndex(l => /^transfers?\s*(routes?)?:/i.test(l) || /^transfers?\s*routes?/i.test(l))
 
   // ── Parse hotels ──
   const hotelEnd = tourSectionIdx > 0 ? tourSectionIdx : (flightSectionIdx > 0 ? flightSectionIdx : nonEmpty.length)
@@ -174,53 +175,68 @@ function parseBookingEmail(body: string): ParsedEmail {
 
   const tours: ParsedTour[] = []
   for (const line of tourBlock) {
-    const match = line.match(/^\d+[.)]\s+(.+)/)
+    // Format A: "1.  10 Oct: Title price"  (Bali-style)
+    // Format B: "Tour 1- 25 Dec 2026 Title price url"  (Sri Lanka / GYG style)
+    const matchA = line.match(/^\d+[.)]\s+(.+)/)
+    const matchB = line.match(/^Tour\s+\d+\s*[-–.)\s]\s*(.+)/i)
+    const match = matchA ?? matchB
     if (!match) continue
     const content = match[1].trim()
 
-    // Date at start: "10 Oct:" or "10 Oct 2026:"
-    const dateMatch = content.match(/^(\d{1,2}\s+[A-Za-z]+(?:\s+\d{4})?)\s*[:\-]\s*(.+)/)
     let tourDate: string | null = null
     let rest = content
 
-    if (dateMatch) {
-      tourDate = parseDate(dateMatch[1])
-      rest = dateMatch[2].trim()
+    // Date with colon separator: "10 Oct: Title" or "10 Oct 2026: Title"
+    const dateColon = content.match(/^(\d{1,2}\s+[A-Za-z]+(?:\s+\d{4})?)\s*[:\-]\s*(.+)/)
+    // Date without colon: "25 Dec 2026 Title" (full year required to avoid eating part of title)
+    const dateSpace = content.match(/^(\d{1,2}\s+[A-Za-z]+\s+\d{4})\s+(.+)/)
+
+    if (dateColon) {
+      tourDate = parseDate(dateColon[1])
+      rest = dateColon[2].trim()
+    } else if (dateSpace) {
+      tourDate = parseDate(dateSpace[1])
+      rest = dateSpace[2].trim()
     }
 
     // Price: "130$" or "$130" or "130 USD"
     const priceMatch = rest.match(/(\d+(?:\.\d+)?)\s*\$|\$\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*USD/i)
     const price = priceMatch ? parseFloat(priceMatch[1] ?? priceMatch[2] ?? priceMatch[3]) : null
 
-    // URL
+    // URL (Get Your Guide or any link)
     const urlMatch = rest.match(/https?:\/\/[^\s]+/i)
 
     // Clean title — remove price and URL
-    let title = rest
+    const title = rest
       .replace(/\s*\d+(?:\.\d+)?\s*\$/, '')
       .replace(/\$\s*\d+(?:\.\d+)?/, '')
       .replace(/https?:\/\/[^\s]+/gi, '')
       .replace(/\s+/g, ' ')
       .trim()
 
-    tours.push({ date: tourDate, title, price, currency: 'USD', booking_link: urlMatch?.[0] ?? null })
+    if (title) tours.push({ date: tourDate, title, price, currency: 'USD', booking_link: urlMatch?.[0] ?? null })
   }
 
   // ── Parse transfers ──
   const transfers: ParsedTransfer[] = []
   if (transferIdx >= 0) {
-    // Transfers are numbered lines below the transfer header, before tours
-    const xferEnd = tourSectionIdx > 0 ? tourSectionIdx : nonEmpty.length
+    const xferEnd = tourSectionIdx > transferIdx ? tourSectionIdx : (flightSectionIdx > transferIdx ? flightSectionIdx : nonEmpty.length)
     const xferBlock = nonEmpty.slice(transferIdx + 1, xferEnd)
     for (const line of xferBlock) {
-      const match = line.match(/^\d+\.\s+(.+)/)
+      const match = line.match(/^\d+[.)]\s+(.+)/)
       if (!match) continue
       const content = match[1].trim()
-      const dateMatch = content.match(/\(([^)]+)\)/)
-      const priceMatch = content.match(/(\d+)\$|\$(\d+)/)
+      // Date can be at start: "24 Dec ..." or "24 Dec 2026 ..."
+      const dateStart = content.match(/^(\d{1,2}\s+[A-Za-z]+(?:\s+\d{4})?)\s+(.+)/)
+      const priceMatch = content.match(/(\d+(?:\.\d+)?)\s*\$|\$\s*(\d+(?:\.\d+)?)/)
+      const urlMatch = content.match(/https?:\/\/[^\s]+/i)
+      const route = content
+        .replace(/https?:\/\/[^\s]+/gi, '')
+        .replace(/(\d+(?:\.\d+)?)\s*\$|\$\s*(\d+(?:\.\d+)?)/, '')
+        .replace(/\s+/g, ' ').trim()
       transfers.push({
-        date: dateMatch ? parseDate(dateMatch[1]) : null,
-        route: content.replace(/\([^)]*\)/g, '').replace(/\d+\$|\$\d+/g, '').trim(),
+        date: dateStart ? parseDate(dateStart[1]) : null,
+        route,
         price: priceMatch ? parseFloat(priceMatch[1] ?? priceMatch[2]) : null,
       })
     }
