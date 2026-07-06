@@ -159,7 +159,7 @@ function ClientCard({ client }: { client: ClientSummary }) {
 export default function ClientsScreen() {
   const [search, setSearch] = useState('')
 
-  const { data: bookings = [], isLoading: loadingBookings } = useQuery({
+  const { data: bookings = [], isLoading: loadingBookings, error: bookingsError } = useQuery({
     queryKey: ['hms_bookings_clients'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -171,21 +171,15 @@ export default function ClientsScreen() {
     },
   })
 
-  const { data: tours = [], isLoading: loadingTours } = useQuery({
+  const { data: tours = [], isLoading: loadingTours, error: toursError } = useQuery({
     queryKey: ['hms_tours_clients'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('hms_tours')
-        .select(`
-          id, client_name, destination, created_at,
-          hms_tour_days!tour_id(
-            id, date,
-            hms_tour_activities!day_id(description)
-          )
-        `)
+        .select(`id, client_name, created_at, hms_tour_days(id, date, hms_tour_activities(description))`)
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data as TourFile[]
+      return (data ?? []).map((t: any) => ({ ...t, destination: t.destination ?? null })) as TourFile[]
     },
   })
 
@@ -215,8 +209,19 @@ export default function ClientsScreen() {
   const totalOutstanding = clients.reduce((s, c) => s + Math.max(0, c.totalQuoted - c.totalPaid), 0)
 
   if (loadingBookings || loadingTours) {
+    return <div className="p-6 text-center text-ivory-400 text-sm">Loading clients…</div>
+  }
+
+  if (bookingsError || toursError) {
     return (
-      <div className="p-6 text-center text-ivory-400 text-sm">Loading clients…</div>
+      <div className="p-6 max-w-2xl mx-auto">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+          <div className="font-semibold mb-1">Error loading clients</div>
+          {bookingsError && <div className="text-xs mb-1">Bookings: {String(bookingsError)}</div>}
+          {toursError && <div className="text-xs">Tours: {String(toursError)}</div>}
+          <div className="text-xs mt-2 text-red-500">Check the browser console (F12) for full details.</div>
+        </div>
+      </div>
     )
   }
 
