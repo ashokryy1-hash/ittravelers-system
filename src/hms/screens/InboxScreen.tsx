@@ -116,17 +116,101 @@ export default function InboxScreen() {
     },
   })
 
+  function mockExtract(body: string, subject: string): ExtractedData {
+    const lower = body.toLowerCase()
+    const isTour = lower.includes('day') && (lower.includes('itinerary') || lower.includes('program') || lower.includes('tour'))
+
+    // Try to pull simple patterns from the pasted text
+    const clientMatch = body.match(/(?:guest(?:\s+name)?|client|dear\s+mr\.?\s*&?\s*mrs\.?|for\s+mr\.?\s*&?\s*mrs\.?)[\s:]+([A-Z][a-z]+(?:\s*&\s*[A-Z][a-z]+)?(?:\s+[A-Z][a-z]+)?)/i)
+    const hotelMatch = body.match(/(?:hotel|property|resort|villa)[\s:]+([A-Za-z &'.-]+)/i)
+    const checkinMatch = body.match(/(?:check[-\s]?in|arrival)[\s:]+([0-9]{1,2}[\s/.-][A-Za-z0-9]+[\s/.-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i)
+    const checkoutMatch = body.match(/(?:check[-\s]?out|departure)[\s:]+([0-9]{1,2}[\s/.-][A-Za-z0-9]+[\s/.-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i)
+    const nightsMatch = body.match(/(\d+)\s*nights?/i)
+    const rateMatch = body.match(/(?:rate|price|cost)[\s\w]*?:?\s*(?:USD|IDR|THB|EGP)?\s*([\d,]+(?:\.\d+)?)\s*(?:\/\s*night|per\s*night)?/i)
+    const currencyMatch = body.match(/\b(USD|IDR|THB|EGP)\b/)
+    const confMatch = body.match(/(?:confirmation|booking|ref(?:erence)?)[\s#:]+([A-Z0-9-]{4,20})/i)
+    const cutoffMatch = body.match(/(?:payment|cutoff|deadline|due)[\s\w]*?(?:by|before|on)?[\s:]+([0-9]{1,2}[\s/.-][A-Za-z0-9]+[\s/.-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i)
+    const mealMatch = body.match(/\b(BB|HB|FB|AI|all[\s-]inclusive|breakfast|half[\s-]board|full[\s-]board)\b/i)
+    const roomMatch = body.match(/(?:room(?:\s+type)?|suite|villa)[\s:]+([A-Za-z ]+?)(?:\n|,|\.)/i)
+
+    function parseDate(raw: string | undefined): string | null {
+      if (!raw) return null
+      const cleaned = raw.trim()
+      if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned
+      const d = new Date(cleaned)
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+      return null
+    }
+
+    const checkin = parseDate(checkinMatch?.[1])
+    const checkout = parseDate(checkoutMatch?.[1])
+    const nights = nightsMatch ? parseInt(nightsMatch[1]) :
+      (checkin && checkout ? Math.round((new Date(checkout).getTime() - new Date(checkin).getTime()) / 86400000) : null)
+
+    const warnings: string[] = []
+    const clientName = clientMatch?.[1]?.trim() ?? null
+    const hotelName = hotelMatch?.[1]?.trim().replace(/\s*:.*/, '') ?? null
+    const rate = rateMatch ? parseFloat(rateMatch[1].replace(/,/g, '')) : null
+
+    if (!clientName) warnings.push('Missing client name')
+    if (!hotelName) warnings.push('Missing hotel name')
+    if (!checkin) warnings.push('Missing check-in date')
+    if (!checkout) warnings.push('Missing check-out date')
+    if (!confMatch) warnings.push('Missing confirmation number')
+    if (!cutoffMatch) warnings.push('Missing cutoff / payment deadline date')
+    if (!rate) warnings.push('Missing rate per night')
+
+    if (isTour) {
+      return {
+        type: 'tour',
+        client_name: clientName,
+        hotel_name: null,
+        room_type: null,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        nights,
+        rate_per_night: null,
+        currency: currencyMatch?.[1] ?? null,
+        meal_plan: null,
+        confirmation_number: confMatch?.[1] ?? null,
+        cutoff_date: null,
+        status: null,
+        notes: null,
+        tour_destination: subject || 'Unknown',
+        tour_days: [],
+        warnings,
+      }
+    }
+
+    return {
+      type: 'reservation',
+      client_name: clientName,
+      hotel_name: hotelName,
+      room_type: roomMatch?.[1]?.trim() ?? null,
+      checkin_date: checkin,
+      checkout_date: checkout,
+      nights,
+      rate_per_night: rate,
+      currency: currencyMatch?.[1] ?? 'USD',
+      meal_plan: mealMatch?.[1]?.toUpperCase() ?? null,
+      confirmation_number: confMatch?.[1] ?? null,
+      cutoff_date: parseDate(cutoffMatch?.[1]),
+      status: lower.includes('confirm') ? 'Confirmed' : 'Availability pending',
+      notes: null,
+      tour_destination: null,
+      tour_days: null,
+      warnings,
+    }
+  }
+
   async function handleExtract() {
     if (!pasteBody.trim()) return toast.error('Paste an email body first')
     setExtracting(true)
     try {
-      const res = await fetch('/api/inbox-extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emailBody: pasteBody, subject: pasteSubject, fromAddress: pasteFrom }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error)
+      // MOCK MODE — reads patterns from the email text directly in the browser.
+      // Replace with real API call once Anthropic credits are added.
+      await new Promise(r => setTimeout(r, 1200)) // simulate processing time
+      const extracted = mockExtract(pasteBody, pasteSubject)
 
       // Save to DB
       const { data, error } = await supabase
@@ -135,7 +219,7 @@ export default function InboxScreen() {
           subject: pasteSubject || null,
           from_address: pasteFrom || null,
           body: pasteBody,
-          extracted_data: json.extracted,
+          extracted_data: extracted,
           status: 'unreviewed',
         })
         .select()
@@ -148,7 +232,7 @@ export default function InboxScreen() {
       setPasteFrom('')
       setPasteBody('')
       setSelectedEmail(data)
-      setEditedData(json.extracted)
+      setEditedData(extracted)
       setView('review')
     } catch (err: any) {
       toast.error(err.message ?? 'Extraction failed')
@@ -518,7 +602,7 @@ export default function InboxScreen() {
               {extracting ? (
                 <><Loader2 size={16} className="animate-spin" /> Analysing email…</>
               ) : (
-                <><Eye size={16} /> Extract Booking Data</>
+                <><Eye size={16} /> Extract Booking Data (Demo Mode)</>
               )}
             </button>
           </div>
