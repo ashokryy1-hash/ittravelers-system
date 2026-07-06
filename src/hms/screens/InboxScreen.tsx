@@ -70,16 +70,39 @@ interface InboxEmail {
 
 // ── Date parser ────────────────────────────────────────────────────────────
 
+const MONTHS: Record<string, string> = {
+  jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06',
+  jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12',
+  january:'01', february:'02', march:'03', april:'04', june:'06',
+  july:'07', august:'08', september:'09', october:'10', november:'11', december:'12',
+}
+
+// Never uses Date constructor — avoids timezone shift bugs
 function parseDate(raw: string): string | null {
   if (!raw) return null
-  const cleaned = raw.trim().replace(/\s+/g, ' ')
-  if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned
-  // Try adding current year if missing
-  const withYear = /\d{4}/.test(cleaned) ? cleaned : cleaned + ' 2026'
-  try {
-    const d = new Date(withYear)
-    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10)
-  } catch { /* ignore */ }
+  const s = raw.trim().replace(/\s+/g, ' ')
+
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+
+  // "9 Oct 2026" / "09 October 2026"
+  const dmy = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
+  if (dmy) {
+    const mon = MONTHS[dmy[2].toLowerCase()]
+    if (mon) return `${dmy[3]}-${mon}-${dmy[1].padStart(2, '0')}`
+  }
+
+  // "Oct 9, 2026" / "October 9 2026"
+  const mdy = s.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/)
+  if (mdy) {
+    const mon = MONTHS[mdy[1].toLowerCase()]
+    if (mon) return `${mdy[3]}-${mon}-${mdy[2].padStart(2, '0')}`
+  }
+
+  // "9/10/2026" or "9-10-2026" (DD/MM/YYYY — common in Egypt)
+  const dmy2 = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/)
+  if (dmy2) return `${dmy2[3]}-${dmy2[2].padStart(2, '0')}-${dmy2[1].padStart(2, '0')}`
+
   return null
 }
 
