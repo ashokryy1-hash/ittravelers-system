@@ -111,6 +111,7 @@ export interface HmsBooking {
   quoted_price: number | null
   paid_price: number | null
   source: string | null
+  room_type_name: string | null
   created_at: string
   hms_hotels?: HmsHotel
   hms_room_types?: HmsRoomType

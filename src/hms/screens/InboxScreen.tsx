@@ -408,6 +408,7 @@ export default function InboxScreen() {
             client_name: clientName,
             hotel_id: hotelMatch?.id ?? null,
             room_type_id: roomMatch?.id ?? null,
+            room_type_name: h.room_type ?? null,
             checkin_date: h.checkin_date ?? '',
             checkout_date: h.checkout_date ?? '',
             nights,
@@ -436,7 +437,8 @@ export default function InboxScreen() {
           .from('hms_tours')
           .insert({
             client_name: clientName,
-            destination: parsed.destination ?? 'Unknown',
+            destination: parsed.destination ?? null,
+            notes: parsed.destination ? `Destination: ${parsed.destination}` : null,
             status: 'Pending',
             booking_link: null,
           })
@@ -444,20 +446,35 @@ export default function InboxScreen() {
           .single()
         if (tourErr) throw new Error('Tour failed: ' + tourErr.message)
 
-        const dayRows = parsed.tours.map((t, i) => ({
-          tour_id: tour.id,
-          day_number: i + 1,
-          title: t.title,
-          description: null,
-          date: t.date,
-          booking_link: t.booking_link,
-          status: 'Pending',
-          quoted_price: t.price,
-          paid_price: null,
-        }))
+        // Insert one day per tour item, then one activity per day with the tour title
+        for (let i = 0; i < parsed.tours.length; i++) {
+          const t = parsed.tours[i]
+          const { data: day, error: dayErr } = await supabase
+            .from('hms_tour_days')
+            .insert({
+              tour_id: tour.id,
+              date: t.date ?? null,
+              sort_order: i + 1,
+              status: 'Pending',
+              booking_link: t.booking_link ?? null,
+              quoted_price: t.price ?? null,
+              paid_price: null,
+            })
+            .select()
+            .single()
+          if (dayErr) throw new Error(`Tour day ${i + 1} failed: ` + dayErr.message)
 
-        const { error: daysErr } = await supabase.from('hms_tour_days').insert(dayRows)
-        if (daysErr) throw new Error('Tour days failed: ' + daysErr.message)
+          // Store title as the activity description
+          const { error: actErr } = await supabase
+            .from('hms_tour_activities')
+            .insert({
+              day_id: day.id,
+              description: t.title,
+              time: '',
+              sort_order: 1,
+            })
+          if (actErr) throw new Error(`Tour activity ${i + 1} failed: ` + actErr.message)
+        }
       }
 
       // 3. Mark email as saved

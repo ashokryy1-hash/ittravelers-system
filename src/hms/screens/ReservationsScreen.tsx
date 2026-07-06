@@ -750,7 +750,7 @@ function BookingCard({ booking, expanded, onToggle, onDraftEmail, onTemplate, on
           </div>
 
           <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <Detail label="Room" value={`${room?.name} (${room?.meal_plan})`} />
+            <Detail label="Room" value={room ? `${room.name}${room.meal_plan ? ` (${room.meal_plan})` : ''}` : ((booking as any).room_type_name ?? null)} />
             {/* Editable rate/night */}
             <div className="flex items-center gap-1.5">
               <span className="text-slate-400 shrink-0">Rate/night</span>
