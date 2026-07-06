@@ -164,7 +164,7 @@ export default function ClientsScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('hms_bookings')
-        .select('*, hms_hotels(name)')
+        .select('*, hms_hotels!hotel_id(name)')
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as HmsBooking[]
@@ -176,7 +176,13 @@ export default function ClientsScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('hms_tours')
-        .select('id, client_name, destination, created_at, hms_tour_days(id, date, hms_tour_activities(description))')
+        .select(`
+          id, client_name, destination, created_at,
+          hms_tour_days!tour_id(
+            id, date,
+            hms_tour_activities!day_id(description)
+          )
+        `)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as TourFile[]
