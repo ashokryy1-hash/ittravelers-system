@@ -310,6 +310,10 @@ export default function InboxScreen() {
   const [selectedEmail, setSelectedEmail] = useState<InboxEmail | null>(null)
   const [parsed, setParsed] = useState<ParsedEmail | null>(null)
   const [saving, setSaving] = useState(false)
+  const [savedHotelIndices, setSavedHotelIndices] = useState<Set<number>>(new Set())
+  const [savingHotelIdx, setSavingHotelIdx] = useState<number | null>(null)
+  const [toursSaved, setToursSaved] = useState(false)
+  const [savingTours, setSavingTours] = useState(false)
 
   // Paste form
   const [pasteSubject, setPasteSubject] = useState('')
@@ -404,6 +408,8 @@ export default function InboxScreen() {
   function openReview(email: InboxEmail) {
     setSelectedEmail(email)
     setParsed(email.extracted_data ?? null)
+    setSavedHotelIndices(new Set())
+    setToursSaved(false)
     setView('review')
   }
 
@@ -424,6 +430,136 @@ export default function InboxScreen() {
       r.hotel_id === hotelId &&
       (r.name.toLowerCase().includes(lower) || lower.includes(r.name.toLowerCase()))
     ) ?? null
+  }
+
+  // ── Save single hotel ─────────────────────────────────────────────────────
+
+  async function saveHotel(h: ParsedHotel, idx: number) {
+    if (!parsed || !selectedEmail) return
+    setSavingHotelIdx(idx)
+    try {
+      const clientName = parsed.client_name ?? 'Unknown Client'
+      const hotelMatch = findHotelMatch(h.hotel_name)
+      const roomMatch = hotelMatch ? findRoomMatch(hotelMatch.id, h.room_type ?? '') : null
+      const nights = h.nights ??
+        (h.checkin_date && h.checkout_date
+          ? Math.round((new Date(h.checkout_date).getTime() - new Date(h.checkin_date).getTime()) / 86400000)
+          : null)
+      const { error } = await supabase.from('hms_bookings').insert({
+        client_name: clientName,
+        hotel_id: hotelMatch?.id ?? null,
+        room_type_id: roomMatch?.id ?? null,
+        room_type_name: h.room_type ?? null,
+        checkin_date: h.checkin_date ?? '',
+        checkout_date: h.checkout_date ?? '',
+        nights,
+        rate_per_night: (h.quoted_price && nights) ? Math.round(h.quoted_price / nights * 100) / 100 : null,
+        total_price_idr: null,
+        total_price_egp: null,
+        currency: h.currency,
+        meal_plan: h.meal_plan,
+        status: 'Availability pending',
+        hotel_confirmation_number: null,
+        cutoff_date: null,
+        notes: hotelMatch ? null : `Manual entry — hotel not in HMS (${h.source})`,
+        quoted_price: h.quoted_price,
+        paid_price: null,
+        source: h.source,
+      })
+      if (error) throw error
+      setSavedHotelIndices(prev => new Set([...prev, idx]))
+      toast.success(`${h.hotel_name} saved to Reservations`)
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSavingHotelIdx(null)
+    }
+  }
+
+  // ── Save tours + transfers ────────────────────────────────────────────────
+
+  async function saveToursAndTransfers() {
+    if (!parsed || !selectedEmail) return
+    setSavingTours(true)
+    try {
+      const clientName = parsed.client_name ?? 'Unknown Client'
+      const { data: tour, error: tourErr } = await supabase
+        .from('hms_tours')
+        .insert({
+          client_name: clientName,
+          destination: parsed.destination ?? null,
+          notes: parsed.destination ? `Destination: ${parsed.destination}` : null,
+          status: 'Pending',
+          booking_link: null,
+        })
+        .select()
+        .single()
+      if (tourErr) throw tourErr
+
+      type DayEntry =
+        | { kind: 'tour'; date: string | null; t: ParsedTour }
+        | { kind: 'transfer'; date: string | null; x: ParsedTransfer }
+      const allDays: DayEntry[] = [
+        ...parsed.tours.map(t => ({ kind: 'tour' as const, date: t.date, t })),
+        ...parsed.transfers.map(x => ({ kind: 'transfer' as const, date: x.date, x })),
+      ].sort((a, b) => (!a.date ? 1 : !b.date ? -1 : a.date.localeCompare(b.date)))
+
+      for (let i = 0; i < allDays.length; i++) {
+        const entry = allDays[i]
+        const isTour = entry.kind === 'tour'
+        const t = isTour ? entry.t : null
+        const x = !isTour ? entry.x : null
+        const { data: day, error: dayErr } = await supabase
+          .from('hms_tour_days')
+          .insert({
+            tour_id: tour.id,
+            date: entry.date ?? null,
+            sort_order: i,
+            status: 'Pending',
+            booking_link: t?.booking_link ?? null,
+            quoted_price: (t?.price ?? x?.price) ?? null,
+            paid_price: null,
+          })
+          .select().single()
+        if (dayErr) throw dayErr
+        let description = ''
+        if (isTour && t) {
+          description = t.title
+        } else if (x) {
+          const arrowMatch = x.route.match(/^(.+?)\s*[→\-–>]+\s*(.+)$/)
+          const from = arrowMatch ? arrowMatch[1].trim() : x.route
+          const to = arrowMatch ? arrowMatch[2].trim() : ''
+          description = `__transfer__:${from}|||${to}|||`
+        }
+        if (description) {
+          await supabase.from('hms_tour_activities').insert({ day_id: day.id, description, time: '', sort_order: 1 })
+        }
+      }
+      setToursSaved(true)
+      toast.success(`Tours & transfers saved for ${clientName}`)
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSavingTours(false)
+    }
+  }
+
+  // ── Mark email done when everything saved ─────────────────────────────────
+
+  async function markEmailDone() {
+    if (!selectedEmail || !parsed) return
+    const allHotelsSaved = parsed.hotels.every((_, i) => savedHotelIndices.has(i))
+    const toursNeeded = parsed.tours.length > 0 || parsed.transfers.length > 0
+    if (!allHotelsSaved || (toursNeeded && !toursSaved)) {
+      toast.error('Save all hotels and tours first')
+      return
+    }
+    await updateEmail.mutateAsync({
+      id: selectedEmail.id,
+      updates: { status: parsed.hotels.length > 0 ? 'saved_reservation' : 'saved_tour', extracted_data: parsed },
+    })
+    toast.success('All done — email marked as saved')
+    setView('list')
   }
 
   // ── Save all ──────────────────────────────────────────────────────────────
@@ -640,8 +776,10 @@ export default function InboxScreen() {
                 <div className="space-y-3">
                   {parsed.hotels.map((h, i) => {
                     const match = findHotelMatch(h.hotel_name)
+                    const isSaved = savedHotelIndices.has(i)
+                    const isSaving = savingHotelIdx === i
                     return (
-                      <div key={i} className="bg-white border border-ivory-200 rounded-xl p-4">
+                      <div key={i} className={`bg-white border rounded-xl p-4 transition-colors ${isSaved ? 'border-green-300 bg-green-50/30' : 'border-ivory-200'}`}>
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div className="font-medium text-sm text-terracotta-800 leading-tight">{h.hotel_name}</div>
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${SOURCE_COLORS[h.source]}`}>
@@ -654,7 +792,7 @@ export default function InboxScreen() {
                             : <><XCircle size={11} /> Not in HMS — will create as manual booking</>
                           }
                         </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-4">
                           <div className="text-ivory-400">Check-in</div>
                           <div className="text-ivory-700 font-medium">{h.checkin_date ?? '—'}</div>
                           <div className="text-ivory-400">Check-out</div>
@@ -668,6 +806,21 @@ export default function InboxScreen() {
                           <div className="text-ivory-400">Quoted</div>
                           <div className="text-terracotta-700 font-semibold">{h.quoted_price ? `${h.currency} ${h.quoted_price}` : '—'}</div>
                         </div>
+                        {isSaved
+                          ? <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-100 rounded-lg px-3 py-2">
+                              <CheckCircle size={13} /> Saved to Reservations
+                            </div>
+                          : <button
+                              onClick={() => saveHotel(h, i)}
+                              disabled={isSaving}
+                              className="w-full text-xs font-semibold bg-terracotta-600 hover:bg-terracotta-700 disabled:opacity-50 text-white py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                            >
+                              {isSaving
+                                ? <><Loader2 size={12} className="animate-spin" /> Saving…</>
+                                : <><Save size={12} /> Save to Reservations</>
+                              }
+                            </button>
+                        }
                       </div>
                     )
                   })}
@@ -679,7 +832,7 @@ export default function InboxScreen() {
             {parsed.transfers.length > 0 && (
               <div className="mb-5">
                 <h3 className="text-xs font-semibold text-ivory-500 uppercase tracking-wide mb-2">
-                  Transfers (info only — not saved)
+                  Transfers → saved with Tours
                 </h3>
                 <div className="bg-white border border-ivory-200 rounded-xl p-4 space-y-2">
                   {parsed.transfers.map((t, i) => (
@@ -725,6 +878,23 @@ export default function InboxScreen() {
                     </div>
                   ))}
                 </div>
+                <div className="mt-3">
+                  {toursSaved
+                    ? <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-100 rounded-lg px-3 py-2">
+                        <CheckCircle size={13} /> Tours & Transfers saved
+                      </div>
+                    : <button
+                        onClick={saveToursAndTransfers}
+                        disabled={savingTours}
+                        className="w-full text-xs font-semibold bg-terracotta-600 hover:bg-terracotta-700 disabled:opacity-50 text-white py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        {savingTours
+                          ? <><Loader2 size={12} className="animate-spin" /> Saving…</>
+                          : <><Save size={12} /> Save Tours & Transfers</>
+                        }
+                      </button>
+                  }
+                </div>
               </div>
             )}
 
@@ -758,13 +928,13 @@ export default function InboxScreen() {
         {/* Action buttons */}
         <div className="flex gap-3 mt-6 pt-5 border-t border-ivory-200">
           <button
-            onClick={saveAll}
-            disabled={saving}
-            className="flex-1 bg-terracotta-600 hover:bg-terracotta-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
+            onClick={markEmailDone}
+            disabled={saving || (totalBookings > 0 && savedHotelIndices.size < totalBookings) || ((totalTours > 0 || parsed.transfers.length > 0) && !toursSaved)}
+            className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
           >
             {saving
-              ? <><Loader2 size={15} className="animate-spin" /> Saving…</>
-              : <><Save size={15} /> Save {totalBookings > 0 ? `${totalBookings} booking${totalBookings > 1 ? 's' : ''}` : ''}{totalBookings > 0 && (totalTours > 0 || parsed.transfers.length > 0) ? ' + ' : ''}{totalTours > 0 ? `${totalTours} tour days` : ''}{totalTours > 0 && parsed.transfers.length > 0 ? ' + ' : ''}{parsed.transfers.length > 0 ? `${parsed.transfers.length} transfers` : ''} to HMS</>
+              ? <><Loader2 size={15} className="animate-spin" /> Marking done…</>
+              : <><CheckCircle size={15} /> Mark as Done</>
             }
           </button>
           <button onClick={ignoreEmail} className="border border-ivory-300 text-ivory-600 text-sm px-5 py-3 rounded-xl hover:bg-ivory-100 transition-colors">
@@ -777,6 +947,11 @@ export default function InboxScreen() {
             <Trash2 size={15} />
           </button>
         </div>
+        {(totalBookings > 0 || totalTours > 0 || parsed.transfers.length > 0) && (
+          <p className="text-center text-xs text-ivory-400 mt-2">
+            Save {totalBookings > 0 ? `all ${totalBookings} hotel${totalBookings > 1 ? 's' : ''}` : ''}{totalBookings > 0 && (totalTours > 0 || parsed.transfers.length > 0) ? ' and ' : ''}{(totalTours > 0 || parsed.transfers.length > 0) ? 'tours/transfers' : ''} above before marking done
+          </p>
+        )}
       </div>
     )
   }

@@ -25,6 +25,7 @@ import ToursScreen from './hms/screens/ToursScreen'
 import LeadsScreen from './hms/screens/LeadsScreen'
 import TripExplorerModule from './hms/screens/TripExplorerModule'
 import InboxScreen from './hms/screens/InboxScreen'
+import ClientsScreen from './hms/screens/ClientsScreen'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +67,7 @@ export default function App() {
                 <Route path="tours" element={<ToursScreen />} />
                 <Route path="trip-explorer/*" element={<TripExplorerModule />} />
                 <Route path="inbox" element={<InboxScreen />} />
+                <Route path="clients" element={<ClientsScreen />} />
                 <Route path="settings" element={<SettingsScreen />} />
               </Route>
             </Route>
