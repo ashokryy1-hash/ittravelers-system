@@ -2,48 +2,248 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import {
-  Inbox, ClipboardPaste, ChevronDown, ChevronUp, AlertTriangle,
-  CheckCircle, XCircle, Eye, Loader2, Save, Trash2, ArrowLeft
+  Inbox, ClipboardPaste, AlertTriangle, Eye, Loader2,
+  Save, Trash2, ArrowLeft, Hotel, MapPin, User, Phone,
+  Calendar, Link as LinkIcon, CheckCircle, XCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type BookingSource = 'Direct' | 'GRN' | 'Ratehawk' | 'TBO' | 'Unknown'
+
+interface ParsedHotel {
+  hotel_name: string
+  source: BookingSource
+  checkin_date: string | null
+  checkout_date: string | null
+  nights: number | null
+  room_type: string | null
+  meal_plan: string | null
+  quoted_price: number | null
+  currency: string
+  // resolved after matching
+  hotel_id?: string | null
+  room_type_id?: string | null
+}
+
+interface ParsedTour {
+  date: string | null
+  title: string
+  price: number | null
+  currency: string
+  booking_link: string | null
+}
+
+interface ParsedTransfer {
+  date: string | null
+  route: string
+  price: number | null
+}
+
+interface ParsedEmail {
+  type: 'booking_request' | 'unknown'
+  client_name: string | null
+  client_phone: string | null
+  destination: string | null
+  travel_date: string | null
+  return_date: string | null
+  handling_agent: string | null
+  dollar_rate: number | null
+  total_quoted: number | null
+  first_payment: number | null
+  hotels: ParsedHotel[]
+  tours: ParsedTour[]
+  transfers: ParsedTransfer[]
+  warnings: string[]
+}
+
 interface InboxEmail {
   id: string
-  received_at: string
   from_address: string | null
   subject: string | null
   body: string
   extracted_data: any | null
   status: 'unreviewed' | 'saved_reservation' | 'saved_tour' | 'ignored'
-  linked_booking_id: string | null
   created_at: string
 }
 
-interface ExtractedData {
-  type: 'reservation' | 'tour' | 'unknown'
-  client_name: string | null
-  hotel_name: string | null
-  room_type: string | null
-  checkin_date: string | null
-  checkout_date: string | null
-  nights: number | null
-  rate_per_night: number | null
-  currency: string | null
-  meal_plan: string | null
-  confirmation_number: string | null
-  cutoff_date: string | null
-  status: string | null
-  notes: string | null
-  tour_destination: string | null
-  tour_days: any[] | null
-  warnings: string[]
+// ── Date parser ────────────────────────────────────────────────────────────
+
+function parseDate(raw: string): string | null {
+  if (!raw) return null
+  const cleaned = raw.trim().replace(/\s+/g, ' ')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned
+  // Try adding current year if missing
+  const withYear = /\d{4}/.test(cleaned) ? cleaned : cleaned + ' 2026'
+  try {
+    const d = new Date(withYear)
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+  } catch { /* ignore */ }
+  return null
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  unreviewed: { label: 'Unreviewed', color: 'bg-amber-100 text-amber-700' },
-  saved_reservation: { label: 'Saved to Reservations', color: 'bg-green-100 text-green-700' },
-  saved_tour: { label: 'Saved to Tours', color: 'bg-blue-100 text-blue-700' },
-  ignored: { label: 'Ignored', color: 'bg-ivory-200 text-ivory-500' },
+// ── Main email parser ──────────────────────────────────────────────────────
+
+function parseBookingEmail(body: string): ParsedEmail {
+  const lines = body.split('\n').map(l => l.trim())
+  const nonEmpty = lines.filter(Boolean)
+
+  function getField(key: string): string | null {
+    const line = nonEmpty.find(l =>
+      l.toLowerCase().replace(/[🔹✈️💰🏨]/g, '').trim().toLowerCase().startsWith(key.toLowerCase() + ':')
+    )
+    if (!line) return null
+    return line.split(':').slice(1).join(':').trim().replace(/^[🔹✈️💰🏨]\s*/, '').trim() || null
+  }
+
+  const clientName = getField('Client Name')
+  const clientPhone = getField('Client Number')
+  const destination = getField('Destinations') ?? getField('Destination')
+  const handlingAgent = getField('Handling Agent')
+  const travelDate = getField('Travel Date')
+  const returnDate = getField('Return Date')
+
+  // Find section boundaries
+  const hotelSectionIdx = nonEmpty.findIndex(l => /🏨|^hotels:/i.test(l))
+  const tourSectionIdx = nonEmpty.findIndex(l => /^tours:/i.test(l.replace(/[^a-zA-Z:]/g, '')))
+  const flightSectionIdx = nonEmpty.findIndex(l => /✈️|flight details/i.test(l))
+  const transferIdx = nonEmpty.findIndex(l => /transfer/i.test(l))
+
+  // ── Parse hotels ──
+  const hotelEnd = tourSectionIdx > 0 ? tourSectionIdx : (flightSectionIdx > 0 ? flightSectionIdx : nonEmpty.length)
+  const hotelBlock = hotelSectionIdx >= 0 ? nonEmpty.slice(hotelSectionIdx + 1, hotelEnd) : []
+
+  const hotels: ParsedHotel[] = []
+  let cur: ParsedHotel | null = null
+
+  for (const line of hotelBlock) {
+    // New hotel line: "Hotel Name 1 (Direct) – Amarea Resort..."
+    if (/^Hotel Name \d+/i.test(line)) {
+      if (cur) hotels.push(cur)
+      const sourceMatch = line.match(/\((Direct|GRN|Ratehawk|TBO)\)/i)
+      const nameMatch = line.match(/[–\-]\s*(.+)$/)
+      cur = {
+        hotel_name: nameMatch?.[1]?.trim() ?? line.replace(/^Hotel Name \d+.*?[–\-]\s*/i, '').trim(),
+        source: (sourceMatch?.[1] as BookingSource) ?? 'Unknown',
+        checkin_date: null, checkout_date: null, nights: null,
+        room_type: null, meal_plan: null, quoted_price: null, currency: 'USD',
+      }
+    } else if (cur) {
+      const lc = line.toLowerCase()
+      if (lc.startsWith('check-in:')) cur.checkin_date = parseDate(line.split(':').slice(1).join(':'))
+      else if (lc.startsWith('check-out:')) cur.checkout_date = parseDate(line.split(':').slice(1).join(':'))
+      else if (lc.startsWith('nights:')) cur.nights = parseInt(line.split(':')[1]) || null
+      else if (lc.startsWith('room type:')) cur.room_type = line.split(':').slice(1).join(':').trim()
+      else if (lc.startsWith('meal plan:')) cur.meal_plan = line.split(':').slice(1).join(':').trim()
+      else if (lc.startsWith('quoted amount:')) {
+        const amt = line.split(':').slice(1).join(':').trim()
+        cur.currency = /IDR/i.test(amt) ? 'IDR' : /THB/i.test(amt) ? 'THB' : /EGP/i.test(amt) ? 'EGP' : 'USD'
+        cur.quoted_price = parseFloat(amt.replace(/[^0-9.]/g, '')) || null
+      }
+    }
+  }
+  if (cur) hotels.push(cur)
+
+  // ── Parse tours ──
+  const tourEnd = flightSectionIdx > 0 ? flightSectionIdx : nonEmpty.length
+  const tourBlock = tourSectionIdx >= 0 ? nonEmpty.slice(tourSectionIdx + 1, tourEnd) : []
+
+  const tours: ParsedTour[] = []
+  for (const line of tourBlock) {
+    const match = line.match(/^\d+[.)]\s+(.+)/)
+    if (!match) continue
+    const content = match[1].trim()
+
+    // Date at start: "10 Oct:" or "10 Oct 2026:"
+    const dateMatch = content.match(/^(\d{1,2}\s+[A-Za-z]+(?:\s+\d{4})?)\s*[:\-]\s*(.+)/)
+    let tourDate: string | null = null
+    let rest = content
+
+    if (dateMatch) {
+      tourDate = parseDate(dateMatch[1])
+      rest = dateMatch[2].trim()
+    }
+
+    // Price: "130$" or "$130" or "130 USD"
+    const priceMatch = rest.match(/(\d+(?:\.\d+)?)\s*\$|\$\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*USD/i)
+    const price = priceMatch ? parseFloat(priceMatch[1] ?? priceMatch[2] ?? priceMatch[3]) : null
+
+    // URL
+    const urlMatch = rest.match(/https?:\/\/[^\s]+/i)
+
+    // Clean title — remove price and URL
+    let title = rest
+      .replace(/\s*\d+(?:\.\d+)?\s*\$/, '')
+      .replace(/\$\s*\d+(?:\.\d+)?/, '')
+      .replace(/https?:\/\/[^\s]+/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    tours.push({ date: tourDate, title, price, currency: 'USD', booking_link: urlMatch?.[0] ?? null })
+  }
+
+  // ── Parse transfers ──
+  const transfers: ParsedTransfer[] = []
+  if (transferIdx >= 0) {
+    // Transfers are numbered lines below the transfer header, before tours
+    const xferEnd = tourSectionIdx > 0 ? tourSectionIdx : nonEmpty.length
+    const xferBlock = nonEmpty.slice(transferIdx + 1, xferEnd)
+    for (const line of xferBlock) {
+      const match = line.match(/^\d+\.\s+(.+)/)
+      if (!match) continue
+      const content = match[1].trim()
+      const dateMatch = content.match(/\(([^)]+)\)/)
+      const priceMatch = content.match(/(\d+)\$|\$(\d+)/)
+      transfers.push({
+        date: dateMatch ? parseDate(dateMatch[1]) : null,
+        route: content.replace(/\([^)]*\)/g, '').replace(/\d+\$|\$\d+/g, '').trim(),
+        price: priceMatch ? parseFloat(priceMatch[1] ?? priceMatch[2]) : null,
+      })
+    }
+  }
+
+  // ── Payment info ──
+  const totalMatch = body.match(/Total Quoted[^:]*:\s*(?:USD\s*)?([\d,]+)\$/i)
+  const dollarRateMatch = body.match(/Dollar rate\s*([\d.]+)/i)
+  const firstPayMatch = body.match(/First Payment[^:]*:\s*USD\s*([\d.]+)/i)
+
+  // ── Warnings ──
+  const warnings: string[] = []
+  if (!clientName) warnings.push('Missing client name')
+  if (hotels.length === 0) warnings.push('No hotels found')
+  hotels.forEach((h, i) => {
+    if (!h.checkin_date) warnings.push(`Hotel ${i + 1}: missing check-in date`)
+    if (!h.checkout_date) warnings.push(`Hotel ${i + 1}: missing check-out date`)
+    if (!h.quoted_price) warnings.push(`Hotel ${i + 1}: missing quoted price`)
+  })
+
+  return {
+    type: hotels.length > 0 || tours.length > 0 ? 'booking_request' : 'unknown',
+    client_name: clientName,
+    client_phone: clientPhone,
+    destination,
+    travel_date: parseDate(travelDate ?? ''),
+    return_date: parseDate(returnDate ?? ''),
+    handling_agent: handlingAgent,
+    dollar_rate: dollarRateMatch ? parseFloat(dollarRateMatch[1]) : null,
+    total_quoted: totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : null,
+    first_payment: firstPayMatch ? parseFloat(firstPayMatch[1]) : null,
+    hotels,
+    tours,
+    transfers,
+    warnings,
+  }
+}
+
+// ── Source badge colors ────────────────────────────────────────────────────
+
+const SOURCE_COLORS: Record<BookingSource, string> = {
+  Direct:   'bg-terracotta-100 text-terracotta-700',
+  GRN:      'bg-blue-100 text-blue-700',
+  Ratehawk: 'bg-purple-100 text-purple-700',
+  TBO:      'bg-green-100 text-green-700',
+  Unknown:  'bg-ivory-200 text-ivory-500',
 }
 
 function timeAgo(dateStr: string) {
@@ -55,14 +255,24 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  unreviewed:        { label: 'Unreviewed',           color: 'bg-amber-100 text-amber-700' },
+  saved_reservation: { label: 'Saved to Reservations', color: 'bg-green-100 text-green-700' },
+  saved_tour:        { label: 'Saved to Tours',        color: 'bg-blue-100 text-blue-700' },
+  ignored:           { label: 'Ignored',               color: 'bg-ivory-200 text-ivory-500' },
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
+
 export default function InboxScreen() {
   const qc = useQueryClient()
   const [view, setView] = useState<'list' | 'paste' | 'review'>('list')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState('all')
   const [selectedEmail, setSelectedEmail] = useState<InboxEmail | null>(null)
-  const [editedData, setEditedData] = useState<ExtractedData | null>(null)
+  const [parsed, setParsed] = useState<ParsedEmail | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  // Paste form state
+  // Paste form
   const [pasteSubject, setPasteSubject] = useState('')
   const [pasteFrom, setPasteFrom] = useState('')
   const [pasteBody, setPasteBody] = useState('')
@@ -80,7 +290,7 @@ export default function InboxScreen() {
     },
   })
 
-  const { data: hotels } = useQuery({
+  const { data: hmsHotels } = useQuery({
     queryKey: ['hms-hotels-inbox'],
     queryFn: async () => {
       const { data } = await supabase.from('hms_hotels').select('id, name, city')
@@ -88,7 +298,7 @@ export default function InboxScreen() {
     },
   })
 
-  const { data: roomTypes } = useQuery({
+  const { data: hmsRooms } = useQuery({
     queryKey: ['hms-rooms-inbox'],
     queryFn: async () => {
       const { data } = await supabase.from('hms_room_types').select('id, hotel_id, name')
@@ -97,7 +307,7 @@ export default function InboxScreen() {
   })
 
   const updateEmail = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InboxEmail> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
       const { error } = await supabase.from('hms_inbox_emails').update(updates).eq('id', id)
       if (error) throw error
     },
@@ -112,114 +322,25 @@ export default function InboxScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inbox-emails'] })
       setView('list')
-      setSelectedEmail(null)
     },
   })
 
-  function mockExtract(body: string, subject: string): ExtractedData {
-    const lower = body.toLowerCase()
-    const isTour = lower.includes('day') && (lower.includes('itinerary') || lower.includes('program') || lower.includes('tour'))
-
-    // Try to pull simple patterns from the pasted text
-    const clientMatch = body.match(/(?:guest(?:\s+name)?|client|dear\s+mr\.?\s*&?\s*mrs\.?|for\s+mr\.?\s*&?\s*mrs\.?)[\s:]+([A-Z][a-z]+(?:\s*&\s*[A-Z][a-z]+)?(?:\s+[A-Z][a-z]+)?)/i)
-    const hotelMatch = body.match(/(?:hotel|property|resort|villa)[\s:]+([A-Za-z &'.-]+)/i)
-    const checkinMatch = body.match(/(?:check[-\s]?in|arrival)[\s:]+([0-9]{1,2}[\s/.-][A-Za-z0-9]+[\s/.-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i)
-    const checkoutMatch = body.match(/(?:check[-\s]?out|departure)[\s:]+([0-9]{1,2}[\s/.-][A-Za-z0-9]+[\s/.-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i)
-    const nightsMatch = body.match(/(\d+)\s*nights?/i)
-    const rateMatch = body.match(/(?:rate|price|cost)[\s\w]*?:?\s*(?:USD|IDR|THB|EGP)?\s*([\d,]+(?:\.\d+)?)\s*(?:\/\s*night|per\s*night)?/i)
-    const currencyMatch = body.match(/\b(USD|IDR|THB|EGP)\b/)
-    const confMatch = body.match(/(?:confirmation|booking|ref(?:erence)?)[\s#:]+([A-Z0-9-]{4,20})/i)
-    const cutoffMatch = body.match(/(?:payment|cutoff|deadline|due)[\s\w]*?(?:by|before|on)?[\s:]+([0-9]{1,2}[\s/.-][A-Za-z0-9]+[\s/.-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i)
-    const mealMatch = body.match(/\b(BB|HB|FB|AI|all[\s-]inclusive|breakfast|half[\s-]board|full[\s-]board)\b/i)
-    const roomMatch = body.match(/(?:room(?:\s+type)?|suite|villa)[\s:]+([A-Za-z ]+?)(?:\n|,|\.)/i)
-
-    function parseDate(raw: string | undefined): string | null {
-      if (!raw) return null
-      const cleaned = raw.trim()
-      if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned
-      const d = new Date(cleaned)
-      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10)
-      return null
-    }
-
-    const checkin = parseDate(checkinMatch?.[1])
-    const checkout = parseDate(checkoutMatch?.[1])
-    const nights = nightsMatch ? parseInt(nightsMatch[1]) :
-      (checkin && checkout ? Math.round((new Date(checkout).getTime() - new Date(checkin).getTime()) / 86400000) : null)
-
-    const warnings: string[] = []
-    const clientName = clientMatch?.[1]?.trim() ?? null
-    const hotelName = hotelMatch?.[1]?.trim().replace(/\s*:.*/, '') ?? null
-    const rate = rateMatch ? parseFloat(rateMatch[1].replace(/,/g, '')) : null
-
-    if (!clientName) warnings.push('Missing client name')
-    if (!hotelName) warnings.push('Missing hotel name')
-    if (!checkin) warnings.push('Missing check-in date')
-    if (!checkout) warnings.push('Missing check-out date')
-    if (!confMatch) warnings.push('Missing confirmation number')
-    if (!cutoffMatch) warnings.push('Missing cutoff / payment deadline date')
-    if (!rate) warnings.push('Missing rate per night')
-
-    if (isTour) {
-      return {
-        type: 'tour',
-        client_name: clientName,
-        hotel_name: null,
-        room_type: null,
-        checkin_date: checkin,
-        checkout_date: checkout,
-        nights,
-        rate_per_night: null,
-        currency: currencyMatch?.[1] ?? null,
-        meal_plan: null,
-        confirmation_number: confMatch?.[1] ?? null,
-        cutoff_date: null,
-        status: null,
-        notes: null,
-        tour_destination: subject || 'Unknown',
-        tour_days: [],
-        warnings,
-      }
-    }
-
-    return {
-      type: 'reservation',
-      client_name: clientName,
-      hotel_name: hotelName,
-      room_type: roomMatch?.[1]?.trim() ?? null,
-      checkin_date: checkin,
-      checkout_date: checkout,
-      nights,
-      rate_per_night: rate,
-      currency: currencyMatch?.[1] ?? 'USD',
-      meal_plan: mealMatch?.[1]?.toUpperCase() ?? null,
-      confirmation_number: confMatch?.[1] ?? null,
-      cutoff_date: parseDate(cutoffMatch?.[1]),
-      status: lower.includes('confirm') ? 'Confirmed' : 'Availability pending',
-      notes: null,
-      tour_destination: null,
-      tour_days: null,
-      warnings,
-    }
-  }
+  // ── Extract ──────────────────────────────────────────────────────────────
 
   async function handleExtract() {
     if (!pasteBody.trim()) return toast.error('Paste an email body first')
     setExtracting(true)
     try {
-      // MOCK MODE — reads patterns from the email text directly in the browser.
-      // Replace with real API call once Anthropic credits are added.
-      await new Promise(r => setTimeout(r, 1200)) // simulate processing time
-      const extracted = mockExtract(pasteBody, pasteSubject)
+      await new Promise(r => setTimeout(r, 800))
+      const result = parseBookingEmail(pasteBody)
 
-      // Save to DB
       const { data, error } = await supabase
         .from('hms_inbox_emails')
         .insert({
           subject: pasteSubject || null,
           from_address: pasteFrom || null,
           body: pasteBody,
-          extracted_data: extracted,
+          extracted_data: result,
           status: 'unreviewed',
         })
         .select()
@@ -227,15 +348,15 @@ export default function InboxScreen() {
       if (error) throw error
 
       qc.invalidateQueries({ queryKey: ['inbox-emails'] })
-      toast.success('Email analysed — review the extracted data')
       setPasteSubject('')
       setPasteFrom('')
       setPasteBody('')
       setSelectedEmail(data)
-      setEditedData(extracted)
+      setParsed(result)
       setView('review')
+      toast.success('Email parsed — review before saving')
     } catch (err: any) {
-      toast.error(err.message ?? 'Extraction failed')
+      toast.error(err.message ?? 'Parsing failed')
     } finally {
       setExtracting(false)
     }
@@ -243,367 +364,375 @@ export default function InboxScreen() {
 
   function openReview(email: InboxEmail) {
     setSelectedEmail(email)
-    setEditedData(email.extracted_data ? { ...email.extracted_data } : null)
+    setParsed(email.extracted_data ?? null)
     setView('review')
   }
 
-  async function saveAsReservation() {
-    if (!editedData || !selectedEmail) return
-    const d = editedData
+  // ── Find HMS match ────────────────────────────────────────────────────────
 
-    // Find hotel match
-    const hotelMatch = hotels?.find(h =>
-      h.name.toLowerCase().includes((d.hotel_name ?? '').toLowerCase()) ||
-      (d.hotel_name ?? '').toLowerCase().includes(h.name.toLowerCase())
-    )
-    const roomMatch = hotelMatch
-      ? roomTypes?.find(r =>
-          r.hotel_id === hotelMatch.id &&
-          r.name.toLowerCase().includes((d.room_type ?? '').toLowerCase())
-        )
-      : null
-
-    const nights = d.nights ??
-      (d.checkin_date && d.checkout_date
-        ? Math.round((new Date(d.checkout_date).getTime() - new Date(d.checkin_date).getTime()) / 86400000)
-        : null)
-
-    const total = nights && d.rate_per_night ? nights * d.rate_per_night : null
-
-    const { data: booking, error } = await supabase
-      .from('hms_bookings')
-      .insert({
-        client_name: d.client_name ?? 'Unknown Client',
-        hotel_id: hotelMatch?.id ?? null,
-        room_type_id: roomMatch?.id ?? null,
-        checkin_date: d.checkin_date ?? '',
-        checkout_date: d.checkout_date ?? '',
-        nights,
-        rate_per_night: d.rate_per_night,
-        total_price_idr: null,
-        total_price_egp: null,
-        currency: d.currency ?? 'USD',
-        meal_plan: d.meal_plan,
-        status: d.status ?? 'Availability pending',
-        hotel_confirmation_number: d.confirmation_number,
-        cutoff_date: d.cutoff_date,
-        notes: d.notes,
-        quoted_price: total,
-        paid_price: null,
-      })
-      .select()
-      .single()
-
-    if (error) { toast.error('Failed to save booking: ' + error.message); return }
-
-    await updateEmail.mutateAsync({
-      id: selectedEmail.id,
-      updates: { status: 'saved_reservation', linked_booking_id: booking.id, extracted_data: editedData },
-    })
-
-    toast.success('Saved to Reservations')
-    setView('list')
+  function findHotelMatch(hotelName: string) {
+    if (!hmsHotels) return null
+    const lower = hotelName.toLowerCase()
+    return hmsHotels.find(h =>
+      h.name.toLowerCase().includes(lower) || lower.includes(h.name.toLowerCase())
+    ) ?? null
   }
 
-  async function saveAsTour() {
-    if (!editedData || !selectedEmail) return
-    const d = editedData
+  function findRoomMatch(hotelId: string, roomName: string) {
+    if (!hmsRooms || !roomName) return null
+    const lower = roomName.toLowerCase()
+    return hmsRooms.find(r =>
+      r.hotel_id === hotelId &&
+      (r.name.toLowerCase().includes(lower) || lower.includes(r.name.toLowerCase()))
+    ) ?? null
+  }
 
-    const { data: tour, error: tourError } = await supabase
-      .from('hms_tours')
-      .insert({
-        client_name: d.client_name ?? 'Unknown Client',
-        destination: d.tour_destination ?? 'Unknown',
-        status: 'Pending',
+  // ── Save all ──────────────────────────────────────────────────────────────
+
+  async function saveAll() {
+    if (!parsed || !selectedEmail) return
+    setSaving(true)
+    try {
+      const clientName = parsed.client_name ?? 'Unknown Client'
+
+      // 1. Create one booking per hotel
+      if (parsed.hotels.length > 0) {
+        const bookingRows = parsed.hotels.map(h => {
+          const hotelMatch = findHotelMatch(h.hotel_name)
+          const roomMatch = hotelMatch ? findRoomMatch(hotelMatch.id, h.room_type ?? '') : null
+          const nights = h.nights ??
+            (h.checkin_date && h.checkout_date
+              ? Math.round((new Date(h.checkout_date).getTime() - new Date(h.checkin_date).getTime()) / 86400000)
+              : null)
+          return {
+            client_name: clientName,
+            hotel_id: hotelMatch?.id ?? null,
+            room_type_id: roomMatch?.id ?? null,
+            checkin_date: h.checkin_date ?? '',
+            checkout_date: h.checkout_date ?? '',
+            nights,
+            rate_per_night: (h.quoted_price && nights) ? Math.round(h.quoted_price / nights * 100) / 100 : null,
+            total_price_idr: null,
+            total_price_egp: null,
+            currency: h.currency,
+            meal_plan: h.meal_plan,
+            status: 'Availability pending',
+            hotel_confirmation_number: null,
+            cutoff_date: null,
+            notes: hotelMatch ? null : `Manual entry — hotel not in HMS (${h.source})`,
+            quoted_price: h.quoted_price,
+            paid_price: null,
+            source: h.source,
+          }
+        })
+
+        const { error: bookErr } = await supabase.from('hms_bookings').insert(bookingRows)
+        if (bookErr) throw new Error('Bookings failed: ' + bookErr.message)
+      }
+
+      // 2. Create tour file if there are tours
+      if (parsed.tours.length > 0) {
+        const { data: tour, error: tourErr } = await supabase
+          .from('hms_tours')
+          .insert({
+            client_name: clientName,
+            destination: parsed.destination ?? 'Unknown',
+            status: 'Pending',
+            booking_link: null,
+          })
+          .select()
+          .single()
+        if (tourErr) throw new Error('Tour failed: ' + tourErr.message)
+
+        const dayRows = parsed.tours.map((t, i) => ({
+          tour_id: tour.id,
+          day_number: i + 1,
+          title: t.title,
+          description: null,
+          date: t.date,
+          booking_link: t.booking_link,
+          status: 'Pending',
+          quoted_price: t.price,
+          paid_price: null,
+        }))
+
+        const { error: daysErr } = await supabase.from('hms_tour_days').insert(dayRows)
+        if (daysErr) throw new Error('Tour days failed: ' + daysErr.message)
+      }
+
+      // 3. Mark email as saved
+      const newStatus = parsed.hotels.length > 0 ? 'saved_reservation' : 'saved_tour'
+      await updateEmail.mutateAsync({
+        id: selectedEmail.id,
+        updates: { status: newStatus, extracted_data: parsed },
       })
-      .select()
-      .single()
 
-    if (tourError) { toast.error('Failed to save tour: ' + tourError.message); return }
-
-    if (d.tour_days?.length) {
-      const days = d.tour_days.map((day: any) => ({
-        tour_id: tour.id,
-        day_number: day.day_number,
-        title: day.title,
-        description: day.description ?? null,
-        date: day.date ?? null,
-        booking_link: day.booking_link ?? null,
-        status: 'Pending',
-        quoted_price: null,
-        paid_price: null,
-      }))
-      const { error: daysError } = await supabase.from('hms_tour_days').insert(days)
-      if (daysError) toast.error('Tour saved but days failed: ' + daysError.message)
+      const parts = []
+      if (parsed.hotels.length > 0) parts.push(`${parsed.hotels.length} booking${parsed.hotels.length > 1 ? 's' : ''}`)
+      if (parsed.tours.length > 0) parts.push(`${parsed.tours.length} tour day${parsed.tours.length > 1 ? 's' : ''}`)
+      toast.success(`Saved: ${parts.join(' + ')}`)
+      setView('list')
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
     }
-
-    await updateEmail.mutateAsync({
-      id: selectedEmail.id,
-      updates: { status: 'saved_tour', extracted_data: editedData },
-    })
-
-    toast.success('Saved to Tours')
-    setView('list')
   }
 
   async function ignoreEmail() {
     if (!selectedEmail) return
     await updateEmail.mutateAsync({ id: selectedEmail.id, updates: { status: 'ignored' } })
-    toast.success('Email marked as ignored')
+    toast.success('Marked as ignored')
     setView('list')
   }
 
   const filtered = (emails ?? []).filter(e =>
-    filterStatus === 'all' ? true : e.status === filterStatus
+    filterStatus === 'all' || e.status === filterStatus
   )
-
   const unreviewedCount = (emails ?? []).filter(e => e.status === 'unreviewed').length
 
-  // ── REVIEW PANEL ──
-  if (view === 'review' && selectedEmail && editedData) {
-    const d = editedData
-    const hotelMatch = hotels?.find(h =>
-      h.name.toLowerCase().includes((d.hotel_name ?? '').toLowerCase()) ||
-      (d.hotel_name ?? '').toLowerCase().includes(h.name.toLowerCase())
-    )
+  // ── REVIEW VIEW ──────────────────────────────────────────────────────────
 
-    function updateField(key: keyof ExtractedData, value: any) {
-      setEditedData(prev => prev ? { ...prev, [key]: value } : prev)
-    }
+  if (view === 'review' && selectedEmail && parsed) {
+    const totalBookings = parsed.hotels.length
+    const totalTours = parsed.tours.length
 
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <button onClick={() => setView('list')} className="flex items-center gap-2 text-sm text-ivory-500 hover:text-terracotta-700 mb-6">
-          <ArrowLeft size={16} /> Back to Inbox
+      <div className="p-6 max-w-5xl mx-auto">
+        <button onClick={() => setView('list')} className="flex items-center gap-2 text-sm text-ivory-500 hover:text-terracotta-700 mb-5">
+          <ArrowLeft size={15} /> Back to Inbox
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Original email */}
-          <div>
-            <h2 className="text-sm font-semibold text-ivory-600 mb-2 uppercase tracking-wide">Original Email</h2>
-            <div className="bg-white rounded-xl border border-ivory-200 p-4">
-              {selectedEmail.subject && (
-                <div className="text-sm font-medium text-terracotta-800 mb-1">{selectedEmail.subject}</div>
-              )}
-              {selectedEmail.from_address && (
-                <div className="text-xs text-ivory-500 mb-3">From: {selectedEmail.from_address}</div>
-              )}
-              <pre className="text-xs text-ivory-700 whitespace-pre-wrap font-sans leading-relaxed max-h-96 overflow-y-auto">
-                {selectedEmail.body}
-              </pre>
-            </div>
+        {/* Client info bar */}
+        <div className="bg-terracotta-50 border border-terracotta-100 rounded-xl px-5 py-4 mb-5 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-terracotta-800">
+            <User size={15} /> {parsed.client_name ?? 'Unknown Client'}
           </div>
+          {parsed.client_phone && (
+            <div className="flex items-center gap-1.5 text-sm text-terracotta-600">
+              <Phone size={13} /> {parsed.client_phone}
+            </div>
+          )}
+          {parsed.destination && (
+            <div className="flex items-center gap-1.5 text-sm text-terracotta-600">
+              <MapPin size={13} /> {parsed.destination}
+            </div>
+          )}
+          {parsed.travel_date && (
+            <div className="flex items-center gap-1.5 text-sm text-terracotta-600">
+              <Calendar size={13} /> {parsed.travel_date} → {parsed.return_date ?? '?'}
+            </div>
+          )}
+          {parsed.handling_agent && (
+            <div className="text-xs text-terracotta-400 ml-auto">Agent: {parsed.handling_agent}</div>
+          )}
+        </div>
 
-          {/* Extracted data */}
+        {/* Warnings */}
+        {parsed.warnings.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+            <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold mb-1.5">
+              <AlertTriangle size={13} /> {parsed.warnings.length} warning{parsed.warnings.length > 1 ? 's' : ''}
+            </div>
+            <ul className="space-y-0.5">
+              {parsed.warnings.map((w, i) => <li key={i} className="text-xs text-amber-700">• {w}</li>)}
+            </ul>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+          {/* LEFT — Hotels */}
           <div>
-            <h2 className="text-sm font-semibold text-ivory-600 mb-2 uppercase tracking-wide">AI Extracted Data</h2>
-            <div className="bg-white rounded-xl border border-ivory-200 p-4 space-y-3">
-
-              {/* Type selector */}
-              <div className="flex gap-2">
-                {(['reservation', 'tour', 'unknown'] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => updateField('type', t)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      d.type === t
-                        ? 'bg-terracotta-600 text-white border-terracotta-600'
-                        : 'border-ivory-300 text-ivory-600 hover:border-terracotta-400'
-                    }`}
-                  >
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
-              </div>
-
-              {/* Warnings */}
-              {d.warnings?.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <div className="flex items-center gap-1.5 text-amber-700 text-xs font-semibold mb-1">
-                    <AlertTriangle size={13} /> Warnings
-                  </div>
-                  <ul className="space-y-0.5">
-                    {d.warnings.map((w, i) => (
-                      <li key={i} className="text-xs text-amber-700">• {w}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Hotel match */}
-              {d.hotel_name && (
-                <div className={`text-xs px-2 py-1 rounded-lg ${hotelMatch ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                  {hotelMatch ? `✓ Matched to: ${hotelMatch.name}` : `✗ No HMS match for "${d.hotel_name}" — will save without hotel link`}
-                </div>
-              )}
-
-              {/* Fields */}
-              {[
-                { label: 'Client Name', key: 'client_name' },
-                { label: 'Hotel Name', key: 'hotel_name' },
-                { label: 'Room Type', key: 'room_type' },
-                { label: 'Check-in', key: 'checkin_date', placeholder: 'YYYY-MM-DD' },
-                { label: 'Check-out', key: 'checkout_date', placeholder: 'YYYY-MM-DD' },
-                { label: 'Nights', key: 'nights', type: 'number' },
-                { label: 'Rate / night', key: 'rate_per_night', type: 'number' },
-                { label: 'Currency', key: 'currency' },
-                { label: 'Meal Plan', key: 'meal_plan' },
-                { label: 'Confirmation #', key: 'confirmation_number' },
-                { label: 'Cutoff / Payment Deadline', key: 'cutoff_date', placeholder: 'YYYY-MM-DD' },
-              ].map(({ label, key, type, placeholder }) => (
-                <div key={key} className="flex items-center gap-2">
-                  <label className="text-xs text-ivory-500 w-40 shrink-0">{label}</label>
-                  <input
-                    type={type ?? 'text'}
-                    value={(d as any)[key] ?? ''}
-                    placeholder={placeholder ?? ''}
-                    onChange={e => updateField(key as keyof ExtractedData, type === 'number' ? (e.target.value ? Number(e.target.value) : null) : e.target.value || null)}
-                    className="flex-1 text-xs border border-ivory-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-terracotta-400"
-                  />
-                </div>
-              ))}
-
-              {d.type === 'reservation' && (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-ivory-500 w-40 shrink-0">Status</label>
-                  <select
-                    value={d.status ?? ''}
-                    onChange={e => updateField('status', e.target.value || null)}
-                    className="flex-1 text-xs border border-ivory-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-terracotta-400"
-                  >
-                    <option value="">Select…</option>
-                    <option>Availability pending</option>
-                    <option>Confirmed</option>
-                    <option>Paid</option>
-                    <option>Cancelled</option>
-                  </select>
-                </div>
-              )}
-
-              {d.type === 'tour' && d.tour_days && (
-                <div className="mt-2">
-                  <div className="text-xs font-semibold text-ivory-600 mb-1">Tour Days ({d.tour_days.length})</div>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {d.tour_days.map((day: any, i: number) => (
-                      <div key={i} className="text-xs bg-ivory-50 rounded px-2 py-1">
-                        Day {day.day_number}: {day.title}
-                        {day.date && <span className="text-ivory-400 ml-1">({day.date})</span>}
+            {parsed.hotels.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-ivory-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <Hotel size={13} /> {totalBookings} Hotel{totalBookings > 1 ? 's' : ''} → Reservations
+                </h3>
+                <div className="space-y-3">
+                  {parsed.hotels.map((h, i) => {
+                    const match = findHotelMatch(h.hotel_name)
+                    return (
+                      <div key={i} className="bg-white border border-ivory-200 rounded-xl p-4">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="font-medium text-sm text-terracotta-800 leading-tight">{h.hotel_name}</div>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${SOURCE_COLORS[h.source]}`}>
+                            {h.source}
+                          </span>
+                        </div>
+                        <div className={`text-xs px-2 py-1 rounded-lg mb-3 flex items-center gap-1.5 ${match ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                          {match
+                            ? <><CheckCircle size={11} /> Matched in HMS: {match.name}</>
+                            : <><XCircle size={11} /> Not in HMS — will create as manual booking</>
+                          }
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                          <div className="text-ivory-400">Check-in</div>
+                          <div className="text-ivory-700 font-medium">{h.checkin_date ?? '—'}</div>
+                          <div className="text-ivory-400">Check-out</div>
+                          <div className="text-ivory-700 font-medium">{h.checkout_date ?? '—'}</div>
+                          <div className="text-ivory-400">Nights</div>
+                          <div className="text-ivory-700 font-medium">{h.nights ?? '—'}</div>
+                          <div className="text-ivory-400">Room</div>
+                          <div className="text-ivory-700 font-medium leading-tight">{h.room_type ?? '—'}</div>
+                          <div className="text-ivory-400">Meal plan</div>
+                          <div className="text-ivory-700 font-medium">{h.meal_plan ?? '—'}</div>
+                          <div className="text-ivory-400">Quoted</div>
+                          <div className="text-terracotta-700 font-semibold">{h.quoted_price ? `${h.currency} ${h.quoted_price}` : '—'}</div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    )
+                  })}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Actions */}
-            <div className="flex gap-2 mt-4">
-              {d.type === 'reservation' && (
-                <button
-                  onClick={saveAsReservation}
-                  className="flex-1 bg-terracotta-600 hover:bg-terracotta-700 text-white text-sm font-medium py-2 rounded-xl flex items-center justify-center gap-2 transition-colors"
-                >
-                  <Save size={15} /> Save to Reservations
-                </button>
-              )}
-              {d.type === 'tour' && (
-                <button
-                  onClick={saveAsTour}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-xl flex items-center justify-center gap-2 transition-colors"
-                >
-                  <Save size={15} /> Save to Tours
-                </button>
-              )}
-              {d.type === 'unknown' && (
-                <>
-                  <button
-                    onClick={saveAsReservation}
-                    className="flex-1 bg-terracotta-600 hover:bg-terracotta-700 text-white text-xs font-medium py-2 rounded-xl transition-colors"
-                  >
-                    Save as Reservation
-                  </button>
-                  <button
-                    onClick={saveAsTour}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 rounded-xl transition-colors"
-                  >
-                    Save as Tour
-                  </button>
-                </>
-              )}
-            </div>
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={ignoreEmail}
-                className="flex-1 border border-ivory-300 text-ivory-600 text-sm py-2 rounded-xl hover:bg-ivory-100 transition-colors"
-              >
-                Ignore
-              </button>
-              <button
-                onClick={() => { if (confirm('Delete this email from inbox?')) deleteEmail.mutate(selectedEmail.id) }}
-                className="border border-red-200 text-red-500 text-sm px-4 py-2 rounded-xl hover:bg-red-50 transition-colors"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
+            {/* Transfers */}
+            {parsed.transfers.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-ivory-500 uppercase tracking-wide mb-2">
+                  Transfers (info only — not saved)
+                </h3>
+                <div className="bg-white border border-ivory-200 rounded-xl p-4 space-y-2">
+                  {parsed.transfers.map((t, i) => (
+                    <div key={i} className="text-xs text-ivory-600 flex justify-between">
+                      <span>{t.date && <span className="text-ivory-400 mr-1">{t.date}</span>}{t.route}</span>
+                      {t.price && <span className="font-medium text-terracotta-700">${t.price}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* RIGHT — Tours */}
+          <div>
+            {parsed.tours.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-ivory-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <MapPin size={13} /> {totalTours} Tour Day{totalTours > 1 ? 's' : ''} → Tours Module
+                </h3>
+                <div className="bg-white border border-ivory-200 rounded-xl divide-y divide-ivory-100">
+                  {parsed.tours.map((t, i) => (
+                    <div key={i} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          {t.date && (
+                            <div className="text-xs text-ivory-400 mb-0.5">{t.date}</div>
+                          )}
+                          <div className="text-sm font-medium text-terracotta-800 leading-tight">{t.title}</div>
+                          {t.booking_link && (
+                            <a href={t.booking_link} target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-blue-600 mt-1 hover:underline">
+                              <LinkIcon size={10} /> Get Your Guide link
+                            </a>
+                          )}
+                        </div>
+                        {t.price && (
+                          <span className="text-sm font-semibold text-terracotta-700 shrink-0">
+                            ${t.price}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Payment summary */}
+            {(parsed.total_quoted || parsed.dollar_rate) && (
+              <div className="bg-ivory-100 border border-ivory-200 rounded-xl p-4 text-xs space-y-1.5">
+                <div className="font-semibold text-ivory-600 uppercase tracking-wide mb-2">Payment Summary</div>
+                {parsed.total_quoted && (
+                  <div className="flex justify-between">
+                    <span className="text-ivory-500">Total quoted</span>
+                    <span className="font-semibold text-terracotta-800">USD {parsed.total_quoted.toLocaleString()}</span>
+                  </div>
+                )}
+                {parsed.first_payment && (
+                  <div className="flex justify-between">
+                    <span className="text-ivory-500">First payment</span>
+                    <span className="font-medium text-terracotta-700">USD {parsed.first_payment}</span>
+                  </div>
+                )}
+                {parsed.dollar_rate && (
+                  <div className="flex justify-between">
+                    <span className="text-ivory-500">Dollar rate</span>
+                    <span className="font-medium text-ivory-700">{parsed.dollar_rate} EGP</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-3 mt-6 pt-5 border-t border-ivory-200">
+          <button
+            onClick={saveAll}
+            disabled={saving}
+            className="flex-1 bg-terracotta-600 hover:bg-terracotta-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
+          >
+            {saving
+              ? <><Loader2 size={15} className="animate-spin" /> Saving…</>
+              : <><Save size={15} /> Save {totalBookings > 0 ? `${totalBookings} booking${totalBookings > 1 ? 's' : ''}` : ''}{totalBookings > 0 && totalTours > 0 ? ' + ' : ''}{totalTours > 0 ? `${totalTours} tour days` : ''} to HMS</>
+            }
+          </button>
+          <button onClick={ignoreEmail} className="border border-ivory-300 text-ivory-600 text-sm px-5 py-3 rounded-xl hover:bg-ivory-100 transition-colors">
+            Ignore
+          </button>
+          <button
+            onClick={() => { if (confirm('Delete this email?')) deleteEmail.mutate(selectedEmail.id) }}
+            className="border border-red-200 text-red-500 px-4 py-3 rounded-xl hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={15} />
+          </button>
         </div>
       </div>
     )
   }
 
-  // ── PASTE VIEW ──
+  // ── PASTE VIEW ────────────────────────────────────────────────────────────
+
   if (view === 'paste') {
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <button onClick={() => setView('list')} className="flex items-center gap-2 text-sm text-ivory-500 hover:text-terracotta-700 mb-6">
-          <ArrowLeft size={16} /> Back to Inbox
+          <ArrowLeft size={15} /> Back to Inbox
         </button>
-
         <div className="bg-white rounded-xl border border-ivory-200 p-6">
           <h2 className="text-lg font-semibold text-terracotta-800 mb-4 flex items-center gap-2">
-            <ClipboardPaste size={18} /> Paste Email
+            <ClipboardPaste size={18} /> Paste Sales Team Email
           </h2>
-
+          <p className="text-xs text-ivory-500 mb-5 leading-relaxed">
+            Copy the full email from your sales team and paste it below. The system will extract all hotels, tours, and client details automatically.
+          </p>
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-ivory-600 mb-1">From (optional)</label>
-              <input
-                type="text"
-                value={pasteFrom}
-                onChange={e => setPasteFrom(e.target.value)}
-                placeholder="e.g. reservations@fourseasons.com"
-                className="w-full text-sm border border-ivory-200 rounded-lg px-3 py-2 focus:outline-none focus:border-terracotta-400"
-              />
+              <input type="text" value={pasteFrom} onChange={e => setPasteFrom(e.target.value)}
+                placeholder="e.g. Menna@ittravelers.com"
+                className="w-full text-sm border border-ivory-200 rounded-lg px-3 py-2 focus:outline-none focus:border-terracotta-400" />
             </div>
             <div>
               <label className="block text-xs font-medium text-ivory-600 mb-1">Subject (optional)</label>
-              <input
-                type="text"
-                value={pasteSubject}
-                onChange={e => setPasteSubject(e.target.value)}
-                placeholder="e.g. Booking Confirmation #12345"
-                className="w-full text-sm border border-ivory-200 rounded-lg px-3 py-2 focus:outline-none focus:border-terracotta-400"
-              />
+              <input type="text" value={pasteSubject} onChange={e => setPasteSubject(e.target.value)}
+                placeholder="e.g. New booking — Fares Elgamal — Bali"
+                className="w-full text-sm border border-ivory-200 rounded-lg px-3 py-2 focus:outline-none focus:border-terracotta-400" />
             </div>
             <div>
               <label className="block text-xs font-medium text-ivory-600 mb-1">Email Body <span className="text-red-400">*</span></label>
-              <textarea
-                value={pasteBody}
-                onChange={e => setPasteBody(e.target.value)}
-                placeholder="Copy the full email text and paste it here…"
-                rows={12}
-                className="w-full text-sm border border-ivory-200 rounded-lg px-3 py-2 focus:outline-none focus:border-terracotta-400 font-mono resize-none"
-              />
+              <textarea value={pasteBody} onChange={e => setPasteBody(e.target.value)}
+                placeholder="Paste the full email here…"
+                rows={14}
+                className="w-full text-sm border border-ivory-200 rounded-lg px-3 py-2 focus:outline-none focus:border-terracotta-400 font-mono resize-none" />
             </div>
-            <button
-              onClick={handleExtract}
-              disabled={extracting || !pasteBody.trim()}
-              className="w-full bg-terracotta-600 hover:bg-terracotta-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors"
-            >
-              {extracting ? (
-                <><Loader2 size={16} className="animate-spin" /> Analysing email…</>
-              ) : (
-                <><Eye size={16} /> Extract Booking Data (Demo Mode)</>
-              )}
+            <button onClick={handleExtract} disabled={extracting || !pasteBody.trim()}
+              className="w-full bg-terracotta-600 hover:bg-terracotta-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors">
+              {extracting
+                ? <><Loader2 size={16} className="animate-spin" /> Parsing email…</>
+                : <><Eye size={16} /> Extract Booking Details</>}
             </button>
           </div>
         </div>
@@ -611,7 +740,8 @@ export default function InboxScreen() {
     )
   }
 
-  // ── LIST VIEW ──
+  // ── LIST VIEW ─────────────────────────────────────────────────────────────
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
@@ -620,20 +750,15 @@ export default function InboxScreen() {
             <Inbox size={22} /> Inbox
           </h1>
           {unreviewedCount > 0 && (
-            <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-              {unreviewedCount}
-            </span>
+            <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{unreviewedCount}</span>
           )}
         </div>
-        <button
-          onClick={() => setView('paste')}
-          className="flex items-center gap-2 bg-terracotta-600 hover:bg-terracotta-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-        >
+        <button onClick={() => setView('paste')}
+          className="flex items-center gap-2 bg-terracotta-600 hover:bg-terracotta-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
           <ClipboardPaste size={16} /> Paste Email
         </button>
       </div>
 
-      {/* Filter tabs */}
       <div className="flex gap-2 mb-4 flex-wrap">
         {[
           { value: 'all', label: 'All' },
@@ -642,20 +767,13 @@ export default function InboxScreen() {
           { value: 'saved_tour', label: 'Tours' },
           { value: 'ignored', label: 'Ignored' },
         ].map(f => (
-          <button
-            key={f.value}
-            onClick={() => setFilterStatus(f.value)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              filterStatus === f.value
-                ? 'bg-terracotta-600 text-white'
-                : 'bg-white border border-ivory-200 text-ivory-600 hover:border-terracotta-400'
-            }`}
-          >
+          <button key={f.value} onClick={() => setFilterStatus(f.value)}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              filterStatus === f.value ? 'bg-terracotta-600 text-white' : 'bg-white border border-ivory-200 text-ivory-600 hover:border-terracotta-400'
+            }`}>
             {f.label}
             {f.value === 'unreviewed' && unreviewedCount > 0 && (
-              <span className="ml-1.5 bg-amber-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
-                {unreviewedCount}
-              </span>
+              <span className="bg-amber-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{unreviewedCount}</span>
             )}
           </button>
         ))}
@@ -671,9 +789,7 @@ export default function InboxScreen() {
         <div className="text-center py-20 text-ivory-400">
           <Inbox size={40} className="mx-auto mb-3 opacity-30" />
           <div className="text-sm">
-            {filterStatus === 'all'
-              ? 'No emails yet — click "Paste Email" to add one'
-              : 'No emails in this category'}
+            {filterStatus === 'all' ? 'No emails yet — click "Paste Email" to add one' : 'No emails in this category'}
           </div>
         </div>
       )}
@@ -681,46 +797,37 @@ export default function InboxScreen() {
       <div className="space-y-2">
         {filtered.map(email => {
           const s = STATUS_LABELS[email.status]
-          const extracted = email.extracted_data as ExtractedData | null
+          const d = email.extracted_data as ParsedEmail | null
+          const hotels = d?.hotels?.length ?? 0
+          const tours = d?.tours?.length ?? 0
           return (
-            <div
-              key={email.id}
-              className="bg-white rounded-xl border border-ivory-200 p-4 flex items-start justify-between gap-4 hover:border-terracotta-200 transition-colors"
-            >
+            <div key={email.id}
+              className="bg-white rounded-xl border border-ivory-200 p-4 flex items-start justify-between gap-4 hover:border-terracotta-200 transition-colors cursor-pointer"
+              onClick={() => openReview(email)}>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.color}`}>
-                    {s.label}
-                  </span>
-                  {extracted?.type && extracted.type !== 'unknown' && (
-                    <span className="text-xs text-ivory-400 capitalize">{extracted.type}</span>
-                  )}
-                  {extracted?.warnings?.length > 0 && (
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.color}`}>{s.label}</span>
+                  {hotels > 0 && <span className="text-xs text-ivory-400">{hotels} hotel{hotels > 1 ? 's' : ''}</span>}
+                  {tours > 0 && <span className="text-xs text-ivory-400">{tours} tour day{tours > 1 ? 's' : ''}</span>}
+                  {d?.warnings?.length > 0 && (
                     <span className="flex items-center gap-1 text-xs text-amber-600">
-                      <AlertTriangle size={11} /> {extracted.warnings.length} warning{extracted.warnings.length > 1 ? 's' : ''}
+                      <AlertTriangle size={11} /> {d.warnings.length} warning{d.warnings.length > 1 ? 's' : ''}
                     </span>
                   )}
                 </div>
-                <div className="text-sm font-medium text-terracotta-800 truncate">
-                  {email.subject ?? '(no subject)'}
-                </div>
-                {email.from_address && (
-                  <div className="text-xs text-ivory-400 mt-0.5">{email.from_address}</div>
-                )}
-                {extracted?.client_name && (
+                <div className="text-sm font-semibold text-terracotta-800 truncate">{email.subject ?? '(no subject)'}</div>
+                {d?.client_name && (
                   <div className="text-xs text-ivory-500 mt-1">
-                    {extracted.client_name}
-                    {extracted.hotel_name && ` · ${extracted.hotel_name}`}
-                    {extracted.checkin_date && ` · ${extracted.checkin_date}`}
+                    {d.client_name}
+                    {d.destination && ` · ${d.destination}`}
+                    {d.travel_date && ` · ${d.travel_date}`}
                   </div>
                 )}
+                {email.from_address && <div className="text-xs text-ivory-400 mt-0.5">{email.from_address}</div>}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-xs text-ivory-400">{timeAgo(email.created_at)}</span>
-                <button
-                  onClick={() => openReview(email)}
-                  className="text-xs bg-terracotta-50 hover:bg-terracotta-100 text-terracotta-700 font-medium px-3 py-1.5 rounded-lg transition-colors"
-                >
+                <button className="text-xs bg-terracotta-50 hover:bg-terracotta-100 text-terracotta-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
                   {email.status === 'unreviewed' ? 'Review →' : 'View'}
                 </button>
               </div>
