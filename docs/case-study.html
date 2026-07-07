@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ITTravelers — Operations Platform Case Study</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #F2E9D6;
+    --bg-dim: #E6D9BD;
+    --surface: #FBF6EA;
+    --text: #202B24;
+    --text-soft: rgba(32,43,36,0.68);
+    --text-faint: rgba(32,43,36,0.46);
+    --accent: #0E6B63;
+    --accent-contrast: #F5EFDF;
+    --line: #C9B98F;
+    --line-soft: rgba(32,43,36,0.14);
+    --invert-bg: #202B24;
+    --invert-text: #F2E9D6;
+    --invert-text-soft: rgba(242,233,214,0.7);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12160F;
+      --bg-dim: #1B2118;
+      --surface: #1A2016;
+      --text: #EDE6D3;
+      --text-soft: rgba(237,230,211,0.68);
+      --text-faint: rgba(237,230,211,0.46);
+      --accent: #49C6B8;
+      --accent-contrast: #0C120C;
+      --line: rgba(237,230,211,0.22);
+      --line-soft: rgba(237,230,211,0.14);
+      --invert-bg: #EDE6D3;
+      --invert-text: #171C13;
+      --invert-text-soft: rgba(23,28,19,0.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #12160F;
+    --bg-dim: #1B2118;
+    --surface: #1A2016;
+    --text: #EDE6D3;
+    --text-soft: rgba(237,230,211,0.68);
+    --text-faint: rgba(237,230,211,0.46);
+    --accent: #49C6B8;
+    --accent-contrast: #0C120C;
+    --line: rgba(237,230,211,0.22);
+    --line-soft: rgba(237,230,211,0.14);
+    --invert-bg: #EDE6D3;
+    --invert-text: #171C13;
+    --invert-text-soft: rgba(23,28,19,0.7);
+  }
+
+  :root[data-theme="light"] {
+    --bg: #F2E9D6;
+    --bg-dim: #E6D9BD;
+    --surface: #FBF6EA;
+    --text: #202B24;
+    --text-soft: rgba(32,43,36,0.68);
+    --text-faint: rgba(32,43,36,0.46);
+    --accent: #0E6B63;
+    --accent-contrast: #F5EFDF;
+    --line: #C9B98F;
+    --line-soft: rgba(32,43,36,0.14);
+    --invert-bg: #202B24;
+    --invert-text: #F2E9D6;
+    --invert-text-soft: rgba(242,233,214,0.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .serif {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  }
+
+  .mono {
+    font-family: "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, ui-monospace, "Courier New", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .label {
+    font-family: "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  a { color: var(--accent); }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  .wrap-wide {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  /* ── Hero ───────────────────────────────────────────────── */
+
+  .hero {
+    padding: 88px 0 56px;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: rise 0.7s ease-out forwards;
+  }
+
+  @keyframes rise {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero .label { color: var(--accent); margin-bottom: 22px; display: block; }
+
+  .hero h1 {
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    font-weight: 500;
+    line-height: 1.12;
+    max-width: 15ch;
+  }
+
+  .hero p.sub {
+    margin-top: 22px;
+    max-width: 56ch;
+    font-size: 1.1rem;
+    color: var(--text-soft);
+  }
+
+  .manifest {
+    margin-top: 40px;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .manifest .cell {
+    padding: 16px 18px;
+    border-left: 1px solid var(--line);
+  }
+  .manifest .cell:first-child { border-left: none; }
+
+  .manifest .cell .label { margin-bottom: 6px; }
+  .manifest .cell .val { font-size: 0.92rem; font-weight: 600; }
+
+  @media (max-width: 640px) {
+    .manifest { grid-template-columns: repeat(2, 1fr); }
+    .manifest .cell:nth-child(3) { border-left: none; }
+  }
+
+  /* ── Section scaffolding ─────────────────────────────────── */
+
+  section { padding: 64px 0; }
+
+  .section-head { margin-bottom: 34px; }
+  .section-head .label { margin-bottom: 12px; }
+  .section-head h2 {
+    font-size: clamp(1.5rem, 3.2vw, 2rem);
+    font-weight: 500;
+  }
+  .section-head p {
+    margin-top: 12px;
+    color: var(--text-soft);
+    max-width: 58ch;
+  }
+
+  .rule {
+    height: 1px;
+    background: var(--line);
+    border: none;
+    margin: 0;
+  }
+
+  /* ── Before: spreadsheet grid ─────────────────────────────── */
+
+  .before-section { background: var(--bg-dim); }
+
+  .sheet {
+    border: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sheet .cell {
+    border: 1px solid var(--line);
+    margin: -1px 0 0 -1px;
+    padding: 20px 22px;
+    background: var(--surface);
+  }
+
+  .sheet .ref {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .sheet .cell h3 {
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .sheet .cell p {
+    margin: 8px 0 0;
+    font-size: 0.94rem;
+    color: var(--text-soft);
+  }
+
+  @media (max-width: 640px) {
+    .sheet { grid-template-columns: 1fr; }
+  }
+
+  .context-note {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px dashed var(--line);
+    color: var(--text-soft);
+    font-size: 0.98rem;
+    max-width: 62ch;
+  }
+
+  /* ── What I built: pull statement ─────────────────────────── */
+
+  .statement {
+    padding: 70px 0;
+  }
+  .statement blockquote {
+    margin: 0;
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-size: clamp(1.35rem, 3vw, 1.85rem);
+    line-height: 1.42;
+    font-weight: 500;
+    max-width: 34ch;
+    text-wrap: balance;
+  }
+  .statement blockquote::before { content: "\201C"; color: var(--accent); }
+  .statement blockquote::after { content: "\201D"; color: var(--accent); }
+
+  /* ── How it works: route ──────────────────────────────────── */
+
+  .route { position: relative; }
+
+  .stop {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 20px;
+    position: relative;
+    padding-bottom: 40px;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .stop.in-view { opacity: 1; transform: translateY(0); }
+  .stop:last-child { padding-bottom: 0; }
+
+  .stop .node-col {
+    position: relative;
+    display: flex;
+    justify-content: center;
+  }
+
+  .stop .node {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    z-index: 1;
+    flex: none;
+  }
+
+  .stop .node-col::after {
+    content: "";
+    position: absolute;
+    top: 36px;
+    bottom: -40px;
+    left: 50%;
+    width: 1px;
+    background: var(--line);
+    transform: translateX(-50%);
+  }
+  .stop:last-child .node-col::after { display: none; }
+
+  .stop .content { padding-top: 6px; }
+  .stop .content .label { margin-bottom: 6px; }
+  .stop h3 { font-size: 1.05rem; font-weight: 700; }
+  .stop p { margin: 8px 0 0; color: var(--text-soft); max-width: 58ch; }
+
+  /* ── Result strip ──────────────────────────────────────────── */
+
+  .result-strip {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .stat {
+    padding: 26px 20px;
+    border-left: 1px dashed var(--line);
+  }
+  .stat:first-child { border-left: none; }
+
+  .stat .shift {
+    font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat .desc { margin-top: 10px; font-size: 0.88rem; color: var(--text-soft); }
+  .stat .est { display: block; margin-top: 6px; font-size: 0.75rem; color: var(--text-faint); font-style: italic; }
+
+  @media (max-width: 720px) {
+    .result-strip { grid-template-columns: repeat(2, 1fr); }
+    .stat:nth-child(3) { border-left: none; }
+    .stat:nth-child(n+3) { border-top: 1px dashed var(--line); }
+  }
+
+  /* ── Learned: inverted band ───────────────────────────────── */
+
+  .learned {
+    background: var(--invert-bg);
+    color: var(--invert-text);
+    padding: 76px 0;
+  }
+  .learned .label { color: var(--invert-text-soft); }
+  .learned p {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-size: clamp(1.1rem, 2.4vw, 1.35rem);
+    line-height: 1.58;
+    max-width: 62ch;
+    margin-top: 20px;
+  }
+
+  /* ── Footer ────────────────────────────────────────────────── */
+
+  footer { padding: 60px 0 90px; }
+
+  .stack-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .stack-tags span {
+    font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
+    font-size: 0.76rem;
+    letter-spacing: 0.02em;
+    padding: 5px 11px;
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    color: var(--text-soft);
+  }
+
+  .summary-card {
+    margin-top: 40px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 24px 26px;
+  }
+  .summary-card p {
+    margin: 12px 0 0;
+    color: var(--text-soft);
+    font-size: 0.96rem;
+  }
+  .copy-btn {
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border: none;
+    border-radius: 7px;
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  .copy-btn:focus-visible, a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .copy-btn:hover { opacity: 0.92; }
+
+  .foot-links {
+    margin-top: 44px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.88rem;
+    color: var(--text-soft);
+  }
+  .foot-links a { text-decoration: none; border-bottom: 1px solid var(--line); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero, .stop { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
+  }
+
+  /* ── Module directory ─────────────────────────────────────── */
+
+  .modules-section { background: var(--bg-dim); }
+
+  .team-block { margin-bottom: 48px; }
+  .team-block:last-child { margin-bottom: 0; }
+  .team-label { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .team-label .count {
+    font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
+    font-size: 0.7rem;
+    color: var(--text-faint);
+  }
+
+  .module-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+
+  .module {
+    background: var(--surface);
+    padding: 22px 22px 24px;
+  }
+
+  .module h3 { font-size: 1rem; font-weight: 700; }
+  .module p { margin: 8px 0 0; font-size: 0.9rem; color: var(--text-soft); }
+  .module .impact {
+    display: block;
+    margin-top: 12px;
+    font-size: 0.82rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap hero">
+  <span class="label">Case File — ITTravelers Operations Platform</span>
+  <h1>Turning a Honeymoon Agency's Spreadsheets Into a System</h1>
+  <p class="sub">How a Cairo travel agency replaced an Excel lead sheet, hotel emails written from scratch, and hand-typed itineraries with one connected platform — with AI reading contracts and inbound emails, always under human review.</p>
+
+  <div class="manifest">
+    <div class="cell"><span class="label">Role</span><div class="val">Operations Manager → Builder</div></div>
+    <div class="cell"><span class="label">Agency</span><div class="val">ITTravelers, Cairo</div></div>
+    <div class="cell"><span class="label">Destinations</span><div class="val">Bali · Thailand · Vietnam · Maldives</div></div>
+    <div class="cell"><span class="label">Status</span><div class="val">Live in production</div></div>
+  </div>
+</header>
+
+<section class="before-section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="label">The Problem</span>
+      <h2>Before: Four Tools That Didn't Talk</h2>
+      <p>Every part of the business ran on a different, disconnected tool — each one manual, and none of them aware the others existed.</p>
+    </div>
+
+    <div class="sheet">
+      <div class="cell">
+        <span class="label ref mono">Sheet1 · A1</span>
+        <h3>Leads</h3>
+        <p>Tracked in an Excel sheet — no pipeline stages, no reminders, no priority.</p>
+      </div>
+      <div class="cell">
+        <span class="label ref mono">Sheet1 · A2</span>
+        <h3>Hotel Emails</h3>
+        <p>Written from scratch every time — or drafted ad hoc by pasting details into ChatGPT.</p>
+      </div>
+      <div class="cell">
+        <span class="label ref mono">Sheet1 · A3</span>
+        <h3>Itineraries</h3>
+        <p>Typed by hand or built as a PDF, trip by trip, with no template to reuse.</p>
+      </div>
+      <div class="cell">
+        <span class="label ref mono">Sheet1 · A4</span>
+        <h3>Contracts &amp; Rates</h3>
+        <p>Held in spreadsheets that the sales team quoted from directly — net cost and client price, same sheet.</p>
+      </div>
+    </div>
+
+    <p class="context-note">None of these tools talked to each other. A lead's status lived in someone's memory. Every email and itinerary was rebuilt from zero. And because sales quoted straight from the sheet holding the agency's real hotel cost, there was no wall between what a hotel charged and what a client was quoted — a quiet margin risk as bookings grew across four countries.</p>
+  </div>
+</section>
+
+<section class="statement">
+  <div class="wrap">
+    <span class="label" style="display:block; margin-bottom:20px;">What I Built</span>
+    <blockquote>One platform, two sides — a live sales tool for quoting honeymoon trips on client calls, and an operations system for leads, contracting, reservations, and itineraries, with AI reading contracts and emails under human review at every step.</blockquote>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="label">How It Works</span>
+      <h2>After: One Route, Seven Stops</h2>
+      <p>The same journey a booking actually takes, end to end — each stop replacing one of the manual tools above.</p>
+    </div>
+
+    <div class="route" id="route">
+      <div class="stop">
+        <div class="node-col"><div class="node">01</div></div>
+        <div class="content">
+          <span class="label">Lead Capture</span>
+          <h3>An inquiry becomes a tracked pipeline entry</h3>
+          <p>Logged with a source, a priority flag, and a stage — New → Contacted → Replied → Meeting → Proposal Sent → Booked — instead of a spreadsheet row.</p>
+        </div>
+      </div>
+      <div class="stop">
+        <div class="node-col"><div class="node">02</div></div>
+        <div class="content">
+          <span class="label">Live Quote</span>
+          <h3>Sales quotes on the call, not after it</h3>
+          <p>Hotels and tours are browsed live on screen share; a PIN-locked portal applies the season price and markup automatically — the real hotel cost never appears.</p>
+        </div>
+      </div>
+      <div class="stop">
+        <div class="node-col"><div class="node">03</div></div>
+        <div class="content">
+          <span class="label">Booking</span>
+          <h3>Season pricing calculates itself</h3>
+          <p>Operations selects the hotel and dates; Low, High, or Peak season is detected automatically and the surcharge applied — no manual season calendar.</p>
+        </div>
+      </div>
+      <div class="stop">
+        <div class="node-col"><div class="node">04</div></div>
+        <div class="content">
+          <span class="label">Hotel Email</span>
+          <h3>One click, not a blank page</h3>
+          <p>Availability requests, reminders, and confirmations generate pre-filled with the right dates and rate, and log themselves against the booking automatically.</p>
+        </div>
+      </div>
+      <div class="stop">
+        <div class="node-col"><div class="node">05</div></div>
+        <div class="content">
+          <span class="label">Contracting</span>
+          <h3>New hotels, found without leaving the app</h3>
+          <p>Prospects are found on Google Maps inside the platform and tracked through a signing pipeline — Prospect → Contacted → Negotiating → Signed.</p>
+        </div>
+      </div>
+      <div class="stop">
+        <div class="node-col"><div class="node">06</div></div>
+        <div class="content">
+          <span class="label">Contract Reading</span>
+          <h3>AI reads the PDF, a person checks it</h3>
+          <p>A signed contract is uploaded and AI extracts every room type and season rate for review — instead of retyping numbers by hand.</p>
+        </div>
+      </div>
+      <div class="stop">
+        <div class="node-col"><div class="node">07</div></div>
+        <div class="content">
+          <span class="label">Itinerary</span>
+          <h3>A trip plan becomes a WhatsApp message</h3>
+          <p>Day-by-day activities, transfers, and airport runs are built once and turned into a ready-to-send itinerary message with a single click.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="modules-section">
+  <div class="wrap-wide">
+    <div class="section-head">
+      <span class="label">The System</span>
+      <h2>Module by Module — Who Uses What, and Why</h2>
+      <p>The journey above is the summary. Underneath it, nine modules split cleanly across two teams — each one built to replace one specific manual habit.</p>
+    </div>
+
+    <div class="team-block">
+      <span class="label team-label">Used by — Sales Team <span class="count">· 2 modules</span></span>
+      <div class="module-cards">
+        <div class="module">
+          <h3>Trip Explorer</h3>
+          <p>Browses Bali destinations, hotels, and tours live with the client, screen-shared on the call, building a shortlist together in real time.</p>
+          <span class="impact">→ Replaced switching between PDFs, spreadsheets, and partner sites mid-call.</span>
+        </div>
+        <div class="module">
+          <h3>Sales Portal</h3>
+          <p>A PIN-locked quoting tool, filterable by destination, area, and budget, that always shows the current, correctly marked-up rate.</p>
+          <span class="impact">→ Sales quotes independently, without ever seeing the agency's real hotel cost.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="team-block">
+      <span class="label team-label">Used by — Operations <span class="count">· 7 modules</span></span>
+      <div class="module-cards">
+        <div class="module">
+          <h3>Leads / CRM</h3>
+          <p>Every inquiry moves through a pipeline — New → Contacted → Replied → Meeting → Proposal → Booked — with a priority flag and one-click WhatsApp follow-up.</p>
+          <span class="impact">→ Replaced an Excel sheet with no reminders — nothing sits untouched unnoticed.</span>
+        </div>
+        <div class="module">
+          <h3>Reservations</h3>
+          <p>One record per hotel booking, grouped into client folders, with season-aware pricing and one-click hotel emails.</p>
+          <span class="impact">→ The daily hub — replaced tracking confirmations across Gmail threads.</span>
+        </div>
+        <div class="module">
+          <h3>Tours</h3>
+          <p>Builds day-by-day itineraries — transfers, airport runs, activities — into a formatted WhatsApp message with one click.</p>
+          <span class="impact">→ Cut a 10–15 minute manual write-up down to a single click.</span>
+        </div>
+        <div class="module">
+          <h3>Discovery</h3>
+          <p>Searches Google Maps for new hotels in a destination and saves the strongest prospects for outreach.</p>
+          <span class="impact">→ Replaced manually googling hotels one by one to find new partners.</span>
+        </div>
+        <div class="module">
+          <h3>Outreach</h3>
+          <p>Tracks each prospective hotel through a contracting pipeline — Prospect → Contacted → Negotiating → Signed — with ready-made email templates.</p>
+          <span class="impact">→ One view of every hotel relationship, instead of scattered inbox threads.</span>
+        </div>
+        <div class="module">
+          <h3>Rates</h3>
+          <p>The living rate sheet — every contracted hotel's room types and season pricing in one place, feeding Reservations and the Sales Portal automatically.</p>
+          <span class="impact">→ Replaced the spreadsheet sales used to quote directly from.</span>
+        </div>
+        <div class="module">
+          <h3>Inbox (AI)</h3>
+          <p>Paste in a forwarded booking confirmation and AI extracts the client, hotel, dates, and rate — flagging anything that looks missing.</p>
+          <span class="impact">→ Cuts manual re-typing of supplier emails into the system.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap-wide">
+    <div class="section-head">
+      <span class="label">The Result</span>
+      <h2>What Changed, In Practical Terms</h2>
+      <p>Some of this is directly measurable; where it isn't, it's a documented estimate or a clear process shift — not a guess dressed up as data.</p>
+    </div>
+
+    <div class="result-strip">
+      <div class="stat">
+        <div class="shift">10–15 min → 1 click</div>
+        <div class="desc">Itinerary messages, previously typed by hand for every trip.</div>
+        <span class="est">Estimate, from build notes</span>
+      </div>
+      <div class="stat">
+        <div class="shift">Excel row → 7-stage pipeline</div>
+        <div class="desc">Leads now move through defined stages with priority flags instead of a flat sheet.</div>
+      </div>
+      <div class="stat">
+        <div class="shift">1 sheet → 1 wall</div>
+        <div class="desc">Net hotel cost is structurally separated from the price sales can quote.</div>
+      </div>
+      <div class="stat">
+        <div class="shift">Rewritten → logged</div>
+        <div class="desc">Every hotel email is generated from a template and recorded automatically.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="learned">
+  <div class="wrap">
+    <span class="label">What I Learned</span>
+    <p>The tempting version of this system would let AI-read contracts or AI-drafted emails go straight out the door. But real hotel relationships and real client money were on the line — one misread rate on a PDF, and the mistake reaches an inbox before anyone checks it. So every AI-touching part of the system stops and waits for a human to review before it saves or sends anything. The hard part of adding AI to a live business wasn't making it work. It was designing around the moments it might be wrong.</p>
+  </div>
+</section>
+
+<footer class="wrap">
+  <span class="label">Built With</span>
+  <div class="stack-tags">
+    <span>React</span><span>TypeScript</span><span>Vite</span><span>Tailwind CSS</span>
+    <span>Supabase / PostgreSQL</span><span>Claude (Anthropic)</span><span>Vercel</span><span>WhatsApp — Green API</span>
+  </div>
+
+  <div class="summary-card">
+    <span class="label">Short Version — For LinkedIn</span>
+    <p id="summary-text">Built ITTravelers HMS, an internal operations platform for a Cairo-based honeymoon travel agency, replacing Excel-based lead tracking, from-scratch hotel emails, and hand-typed itineraries with one connected system — including AI-powered contract and email reading (via Anthropic's Claude) that a human always reviews before anything saves or sends. Sales quotes trips instantly with automatic seasonal pricing and margin protection, while operations manages leads, hotel contracting, reservations, and itineraries from a single dashboard — taken from idea to a live tool the business uses daily.</p>
+    <div style="margin-top:16px;">
+      <button class="copy-btn" id="copy-btn" type="button">Copy summary</button>
+    </div>
+  </div>
+
+  <div class="foot-links">
+    <span>Built by Ahmed Shokry — Operations Manager, ITTravelers</span>
+    <span>
+      <a href="https://ittravelers-system.vercel.app" target="_blank" rel="noopener">Live app</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/ashokryy1-hash/ittravelers-system" target="_blank" rel="noopener">Source</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var btn = document.getElementById('copy-btn');
+    var text = document.getElementById('summary-text');
+    if (btn && text) {
+      btn.addEventListener('click', function () {
+        navigator.clipboard.writeText(text.textContent.trim()).then(function () {
+          var original = btn.textContent;
+          btn.textContent = 'Copied';
+          setTimeout(function () { btn.textContent = original; }, 1800);
+        });
+      });
+    }
+
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var stops = document.querySelectorAll('.stop');
+    if (reduceMotion || !('IntersectionObserver' in window)) {
+      stops.forEach(function (el) { el.classList.add('in-view'); });
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.25 });
+      stops.forEach(function (el) { io.observe(el); });
+    }
+  })();
+</script>
+</body>
+</html>
