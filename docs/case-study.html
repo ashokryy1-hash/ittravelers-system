@@ -315,32 +315,30 @@
   /* ── Result strip ──────────────────────────────────────────── */
 
   .result-strip {
-    background: var(--surface);
-    border: 1px solid var(--line);
     display: grid;
     grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
   }
 
   .stat {
-    padding: 26px 20px;
-    border-left: 1px dashed var(--line);
+    background: var(--surface);
+    padding: 24px 20px;
   }
-  .stat:first-child { border-left: none; }
 
   .stat .shift {
     font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
     font-variant-numeric: tabular-nums;
-    font-size: 1.05rem;
+    font-size: 1.02rem;
     font-weight: 700;
     color: var(--accent);
   }
-  .stat .desc { margin-top: 10px; font-size: 0.88rem; color: var(--text-soft); }
+  .stat .desc { margin-top: 10px; font-size: 0.86rem; color: var(--text-soft); }
   .stat .est { display: block; margin-top: 6px; font-size: 0.75rem; color: var(--text-faint); font-style: italic; }
 
   @media (max-width: 720px) {
     .result-strip { grid-template-columns: repeat(2, 1fr); }
-    .stat:nth-child(3) { border-left: none; }
-    .stat:nth-child(n+3) { border-top: 1px dashed var(--line); }
   }
 
   /* ── Learned: inverted band ───────────────────────────────── */
@@ -471,7 +469,7 @@
   <p class="sub">How a Cairo travel agency replaced an Excel lead sheet, a separate reservations sheet, hotel emails written from scratch, and hand-typed itineraries with one connected platform — with AI reading contracts and inbound emails, always under human review.</p>
 
   <div class="manifest">
-    <div class="cell"><span class="label">Role</span><div class="val">Operations Manager → Builder</div></div>
+    <div class="cell"><span class="label">Role</span><div class="val">Operations Manager, 4 yrs → Builder</div></div>
     <div class="cell"><span class="label">Agency</span><div class="val">ITTravelers, Cairo</div></div>
     <div class="cell"><span class="label">Destinations</span><div class="val">Egypt Classic (Cairo · Luxor · Aswan) · Red Sea · Bali · Thailand · Vietnam · Maldives</div></div>
     <div class="cell"><span class="label">Status</span><div class="val">Live in production</div></div>
@@ -516,7 +514,7 @@
 <section class="statement">
   <div class="wrap">
     <span class="label" style="display:block; margin-bottom:20px;">What I Built</span>
-    <blockquote>One platform, two sides — a live sales tool for quoting honeymoon trips on client calls, and an operations system for leads, contracting, reservations, and itineraries, with AI reading contracts and emails under human review at every step.</blockquote>
+    <blockquote>One platform, two sides — a live sales tool for quoting trips on client calls, and an operations system for contracting, reservations, and itineraries, with AI reading finalized bookings and contracts under human review at every step.</blockquote>
   </div>
 </section>
 
@@ -532,9 +530,9 @@
       <div class="stop">
         <div class="node-col"><div class="node">01</div></div>
         <div class="content">
-          <span class="label">Lead Capture</span>
+          <span class="label">Lead Capture — Sales Only</span>
           <h3>An inquiry becomes a tracked pipeline entry</h3>
-          <p>Logged with a source, a priority flag, and a stage — New → Contacted → Replied → Meeting → Proposal Sent → Booked — instead of a spreadsheet row.</p>
+          <p>Logged with a source, a priority flag, and a stage — New → Contacted → Replied → Meeting → Proposal Sent → Booked — with scheduled meetings and WhatsApp follow-ups, instead of a spreadsheet row. Sales owns this pipeline end to end.</p>
         </div>
       </div>
       <div class="stop">
@@ -556,9 +554,9 @@
       <div class="stop">
         <div class="node-col"><div class="node">04</div></div>
         <div class="content">
-          <span class="label">Booking</span>
-          <h3>Season pricing calculates itself</h3>
-          <p>Once the client confirms, operations selects the hotel and dates; Low, High, or Peak season is detected automatically and the surcharge applied — no manual season calendar.</p>
+          <span class="label">Handover — Sales → Operations</span>
+          <h3>AI reads the finalized booking, not a person retyping it</h3>
+          <p>Once sales marks the deal Booked, the confirmed details are pasted into the AI Inbox. AI extracts every hotel, tour, and transfer automatically, flagging anything that looks missing — operations reviews it, then saves. The reservation is created with the season rate already applied, and the day-by-day tour itinerary is drafted at the same time.</p>
         </div>
       </div>
       <div class="stop">
@@ -589,8 +587,8 @@
         <div class="node-col"><div class="node">08</div></div>
         <div class="content">
           <span class="label">Itinerary</span>
-          <h3>A trip plan becomes a WhatsApp message</h3>
-          <p>Day-by-day activities, transfers, and airport runs are built once and turned into a ready-to-send itinerary message with a single click.</p>
+          <h3>The draft plan becomes a ready-to-send message</h3>
+          <p>The day-by-day plan drafted at handover is refined — transfers, airport runs, and activities confirmed or added — then turned into a formatted WhatsApp itinerary message with a single click.</p>
         </div>
       </div>
     </div>
@@ -606,8 +604,13 @@
     </div>
 
     <div class="team-block">
-      <span class="label team-label">Used by — Sales Team <span class="count">· 2 modules</span></span>
+      <span class="label team-label">Used by — Sales Team <span class="count">· 3 modules</span></span>
       <div class="module-cards">
+        <div class="module">
+          <h3>Leads / CRM</h3>
+          <p>Owned end to end by sales — every inquiry moves through a pipeline (New → Contacted → Replied → Meeting → Proposal Sent → Booked) with priority flags, scheduled meetings, and one-click WhatsApp follow-ups. The deal is worked here from first contact to signed booking — operations only sees it once it's marked Booked.</p>
+          <span class="impact">→ Replaced an Excel sheet with no reminders — nothing sits untouched unnoticed.</span>
+        </div>
         <div class="module">
           <h3>Trip Explorer</h3>
           <p>Screen-shared live on the call, so the client and the sales agent browse hotels and tours together and tick each one the client likes — not the agent guessing what to offer. Everything ticked lands in a session summary, grouped by area, ready to copy at the end of the call.</p>
@@ -622,13 +625,8 @@
     </div>
 
     <div class="team-block">
-      <span class="label team-label">Used by — Operations <span class="count">· 7 modules</span></span>
+      <span class="label team-label">Used by — Operations <span class="count">· 6 modules</span></span>
       <div class="module-cards">
-        <div class="module">
-          <h3>Leads / CRM</h3>
-          <p>Every inquiry moves through a pipeline — New → Contacted → Replied → Meeting → Proposal → Booked — with a priority flag and one-click WhatsApp follow-up.</p>
-          <span class="impact">→ Replaced an Excel sheet with no reminders — nothing sits untouched unnoticed.</span>
-        </div>
         <div class="module">
           <h3>Reservations</h3>
           <p>One record per hotel booking, grouped into client folders, with season-aware pricing and one-click hotel emails.</p>
@@ -656,8 +654,8 @@
         </div>
         <div class="module">
           <h3>Inbox (AI)</h3>
-          <p>Paste in a forwarded booking confirmation and AI extracts the client, hotel, dates, and rate — flagging anything that looks missing.</p>
-          <span class="impact">→ Cuts manual re-typing of supplier emails into the system.</span>
+          <p>The handover point between sales and operations. Once sales marks a deal Booked, its finalized details are pasted in here — AI reads them and automatically extracts every hotel, tour, and transfer, then creates the reservation records and drafts the day-by-day tour itinerary, instead of operations typing each one in from scratch. Anything that looks missing is flagged before it's saved.</p>
+          <span class="impact">→ Turns a finalized booking into ready reservation and itinerary records in minutes, not a manual re-entry job.</span>
         </div>
       </div>
     </div>
@@ -669,26 +667,42 @@
     <div class="section-head">
       <span class="label">The Result</span>
       <h2>What Changed, In Practical Terms</h2>
-      <p>Some of this is directly measurable; where it isn't, it's a documented estimate or a clear process shift — not a guess dressed up as data.</p>
+      <p>Efficiency, automation, and collaboration gains across both teams. Some of this is directly measurable; where it isn't, it's a documented estimate or a clear process shift — not a guess dressed up as data.</p>
     </div>
 
     <div class="result-strip">
+      <div class="stat">
+        <div class="shift">Excel row → 7-stage pipeline</div>
+        <div class="desc">Leads now move through defined stages with priority flags and scheduled meetings instead of a flat sheet — sales always knows what's open and what's overdue.</div>
+      </div>
+      <div class="stat">
+        <div class="shift">1 sheet → 1 wall</div>
+        <div class="desc">Net hotel cost is structurally separated from the price sales can quote — margin is protected by design, not by discipline.</div>
+      </div>
+      <div class="stat">
+        <div class="shift">Retyped → auto-extracted</div>
+        <div class="desc">A finalized booking's hotels, tours, and transfers are read by AI at handover instead of typed into the system twice, by two different people.</div>
+      </div>
+      <div class="stat">
+        <div class="shift">Two sheets → one record</div>
+        <div class="desc">Sales and operations now work off the same booking as it moves from lead to reservation to itinerary, instead of two teams keeping separate, unsynced notes.</div>
+      </div>
+      <div class="stat">
+        <div class="shift">Rewritten → logged</div>
+        <div class="desc">Every hotel email is generated from a template and recorded automatically, instead of written from scratch and untracked.</div>
+      </div>
       <div class="stat">
         <div class="shift">10–15 min → 1 click</div>
         <div class="desc">Itinerary messages, previously typed by hand for every trip.</div>
         <span class="est">Estimate, from build notes</span>
       </div>
       <div class="stat">
-        <div class="shift">Excel row → 7-stage pipeline</div>
-        <div class="desc">Leads now move through defined stages with priority flags instead of a flat sheet.</div>
+        <div class="shift">PDF → structured rate</div>
+        <div class="desc">Signed hotel contracts are read by AI straight into the rate sheet instead of retyped room by room.</div>
       </div>
       <div class="stat">
-        <div class="shift">1 sheet → 1 wall</div>
-        <div class="desc">Net hotel cost is structurally separated from the price sales can quote.</div>
-      </div>
-      <div class="stat">
-        <div class="shift">Rewritten → logged</div>
-        <div class="desc">Every hotel email is generated from a template and recorded automatically.</div>
+        <div class="shift">No dashboard → live pipeline</div>
+        <div class="desc">Lead stages, booking statuses, and hotel contracting progress are visible at a glance, instead of a status update someone has to compile by hand.</div>
       </div>
     </div>
   </div>
@@ -710,14 +724,14 @@
 
   <div class="summary-card">
     <span class="label">Short Version — For LinkedIn</span>
-    <p id="summary-text">Built ITTravelers HMS, an internal operations platform for a Cairo-based honeymoon travel agency, replacing Excel-based lead tracking, from-scratch hotel emails, and hand-typed itineraries with one connected system — including AI-powered contract and email reading (via Anthropic's Claude) that a human always reviews before anything saves or sends. Sales quotes trips instantly with automatic seasonal pricing and margin protection, while operations manages leads, hotel contracting, reservations, and itineraries from a single dashboard — taken from idea to a live tool the business uses daily.</p>
+    <p id="summary-text">During my four years as Operations Manager at ITTravelers — a Cairo-based outbound travel agency (honeymoons, classic Egypt tours, group travel) that also operates as a Destination Management Company for international partners — I designed and built its internal operations platform. It replaced Excel-based lead tracking, a separate reservations sheet, from-scratch hotel emails, and hand-typed itineraries with one connected system, including AI that reads finalized bookings and hotel contracts automatically, always reviewed by a person before anything saves or sends. Sales runs the full pipeline from lead to quote independently; operations manages reservations, hotel contracting, and itineraries from a single dashboard. Live in production, used daily by both teams.</p>
     <div style="margin-top:16px;">
       <button class="copy-btn" id="copy-btn" type="button">Copy summary</button>
     </div>
   </div>
 
   <div class="foot-links">
-    <span>Built by Ahmed Shokry — Operations Manager, ITTravelers</span>
+    <span>Built by Ahmed Shokry — Operations Manager at ITTravelers (4 yrs), designer and builder of this platform</span>
     <span>
       <a href="https://ittravelers-system.vercel.app" target="_blank" rel="noopener">Live app</a>
       &nbsp;·&nbsp;
